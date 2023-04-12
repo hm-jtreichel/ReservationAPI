@@ -1,0 +1,1 @@
+uvicorn GrapheneGraphqlExample:app --reload
