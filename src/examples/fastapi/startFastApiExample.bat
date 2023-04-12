@@ -1,0 +1,1 @@
+uvicorn FastApiExample:app --reload
