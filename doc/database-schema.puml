@@ -1,0 +1,72 @@
+@startuml
+
+entity Restaurant {
+    * id : number <<generated, PK>>
+    --
+    * owner_id : number <<FK>>
+    * address_id : number <<FK>>
+    * name : varchar
+}
+
+entity BusinessHour {
+    * id : number <<generated, PK>>
+    --
+    * restaurant_id : number <<FK>>
+    * weekday : number
+    * open_time : time
+    * open_for_reservation_until : time
+    * close_time : time
+}
+
+entity Owner {
+    * id : number <<generated, PK>>
+    --
+    * first_name : varchar
+    * last_name : varchar
+    * email : varchar
+    phone : varchar
+}
+
+entity Address {
+    * id : number <<generated, PK>>
+    --
+    * street_name : varchar
+    * house_number : varchar
+    * postal_code : number
+    * city : varchar
+    * country_code : varchar
+}
+note bottom of Address : <country_code> could also be its own entity, but verifying\ncorrect country-codes inside the sourcecode is\nsufficient for our usecase.
+
+entity Table {
+    * id : number <<generated, PK>>
+    --
+    * restaurant_id : number <<FK>>
+    * name : varchar
+    * seats : number
+    * min_seats_required_for_reservation : number
+    disabled_until : datetime
+}
+note bottom of Table : <disabled_until> allows the owner to disable certain\ntables until a specified point in time if\nthey are - for example - short on staff.
+
+entity Reservation {
+    * id : number <<generated, PK>>
+    --
+    * table_id : number <<FK>>
+    * customer_name : varchar
+    * customer_email : varchar
+    * reserved_from: datetime
+    * reserved_until: datetime
+    * guest_amount : number
+    customer_phone : varchar
+    additional_information : varchar
+}
+
+Restaurant }o--|| Owner
+Restaurant ||--o{ BusinessHour
+Restaurant ||--|| Address
+
+Restaurant ||--o{ Table
+Table ||--o{ Reservation
+
+@enduml
