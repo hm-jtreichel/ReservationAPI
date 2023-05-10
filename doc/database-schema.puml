@@ -4,7 +4,6 @@ entity Restaurant {
     * id : number <<generated, PK>>
     --
     * owner_id : number <<FK>>
-    * address_id : number <<FK>>
     * name : varchar
 }
 
@@ -30,6 +29,7 @@ entity Owner {
 entity Address {
     * id : number <<generated, PK>>
     --
+    * restaurant_id : number <<FK>>
     * street_name : varchar
     * house_number : varchar
     * postal_code : number

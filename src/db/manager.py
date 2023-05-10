@@ -22,26 +22,20 @@ class SessionFacade:
     This class provides a simplified interface to the SQLAlchemy ORM session
     object. It exposes only the session methods needed by the project.
     """
+    _session = Session(engine)
 
-    def __init__(self):
-        """
-        Initializes a new SessionFacade object.
-
-        Creates a new instance of SQLAlchemy's Session class and assigns it to
-        the 'session' attribute of this object.
-        """
-        self._session = Session(engine)
-
-    def add(self, obj: object):
+    @staticmethod
+    def add(obj: object):
         """
         Adds a single object to the session.
 
         Args:
             obj (object): The object to add to the session.
         """
-        self._session.add(obj)
+        SessionFacade._session.add(obj)
 
-    def add_all(self, instances: Iterable[object]):
+    @staticmethod
+    def add_all(instances: Iterable[object]):
         """
         Adds a collection of objects to the session.
 
@@ -49,9 +43,10 @@ class SessionFacade:
             instances (Iterable[object]): An iterable containing the objects to
                 add to the session.
         """
-        self._session.add_all(instances)
+        SessionFacade._session.add_all(instances)
 
-    def merge(self, obj: object):
+    @staticmethod
+    def merge(obj: object):
         """
         Merges the given object into the session.
 
@@ -60,9 +55,10 @@ class SessionFacade:
         obj : object
             The object to be merged into the session
         """
-        self._session.merge(obj)
+        SessionFacade._session.merge(obj)
 
-    def merge_all(self, instances: Iterable[object]):
+    @staticmethod
+    def merge_all(instances: Iterable[object]):
         """
         Merges all instances in the given iterable into the session.
 
@@ -72,27 +68,30 @@ class SessionFacade:
             The instances to be merged into the session.
         """
         for instance in instances:
-            self.merge(instance)
+            SessionFacade.merge(instance)
 
-    def commit(self):
+    @staticmethod
+    def commit():
         """
         Commits the current transaction.
 
         Commits any changes made to objects in the session since the last commit
         or rollback. If there are no changes, this method does nothing.
         """
-        self._session.commit()
+        SessionFacade._session.commit()
 
-    def rollback(self):
+    @staticmethod
+    def rollback():
         """
         Roll back the current transaction in the session.
 
         This method rolls back the current transaction in the session. It undoes all changes made to the objects
         since the last commit. Any objects that were added to the session will be removed.
         """
-        self._session.rollback()
+        SessionFacade._session.rollback()
 
-    def scalars(self, statement: Executable) -> ScalarResult:
+    @staticmethod
+    def scalars(statement: Executable) -> ScalarResult:
         """
         Executes a SQL statement and returns a scalar result.
 
@@ -102,9 +101,10 @@ class SessionFacade:
         Returns:
             ScalarResult: The result of executing the statement as a scalar value.
         """
-        return self._session.scalars(statement)
+        return SessionFacade._session.scalars(statement)
 
-    def delete(self, obj: object):
+    @staticmethod
+    def delete(obj: object):
         """
         Deletes the given object from the session.
 
@@ -113,9 +113,10 @@ class SessionFacade:
         obj : object
             The object to be deleted from the session.
         """
-        self._session.delete(obj)
+        SessionFacade._session.delete(obj)
 
-    def delete_all(self, instances: Iterable[object]):
+    @staticmethod
+    def delete_all(instances: Iterable[object]):
         """
         Deletes all instances in the given iterable from the session.
 
@@ -125,4 +126,4 @@ class SessionFacade:
             The instances to be deleted from the session.
         """
         for instance in instances:
-            self.delete(instance)
+            SessionFacade.delete(instance)

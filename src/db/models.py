@@ -36,11 +36,12 @@ class Restaurant(Base):
     name: Mapped[str]
 
     owner_id: Mapped[int] = mapped_column(ForeignKey("owner.id"))
-    address_id: Mapped[int] = mapped_column(ForeignKey("address.id"))
 
     owner: Mapped[Owner] = relationship(back_populates="restaurants")
-    address: Mapped[Address] = relationship(back_populates="restaurant")
-    business_hours: Mapped[List[BusinessHour]] = relationship(back_populates="restaurant")
+    address: Mapped[Address] = relationship(back_populates="restaurant",
+                                            cascade="save-update, merge, delete, delete-orphan")
+    business_hours: Mapped[List[BusinessHour]] = relationship(back_populates="restaurant",
+                                                              cascade="save-update, merge, delete, delete-orphan")
     tables: Mapped[List[Table]] = relationship(back_populates="restaurant")
 
     def __repr__(self) -> str:
@@ -98,6 +99,8 @@ class Address(Base):
     postal_code: Mapped[int]
     city: Mapped[str]
     country_code: Mapped[str]
+
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurant.id"))
 
     restaurant: Mapped[Restaurant] = relationship(back_populates="address")
 
