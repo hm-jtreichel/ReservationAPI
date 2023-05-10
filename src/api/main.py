@@ -2,6 +2,8 @@ from fastapi import FastAPI
 
 from .owners import owners
 from .restaurants import restaurants
+from .tables import tables
+from .reservations import reservations
 
 description = """
 This project was being developed during the class "Enterprise-Information-Management" in Summer 2023.
@@ -23,6 +25,14 @@ tags_metadata = [
         "name": "restaurants",
         "description": "Operations with restaurants"
     },
+    {
+        "name": "tables",
+        "description": "Operations with tables"
+    },
+    {
+        "name": "reservations",
+        "description": "Operations with reservations"
+    }
 ]
 
 app = FastAPI(
@@ -39,3 +49,5 @@ app = FastAPI(
 
 app.include_router(owners.router)
 app.include_router(restaurants.router)
+app.include_router(tables.router)
+app.include_router(reservations.router)

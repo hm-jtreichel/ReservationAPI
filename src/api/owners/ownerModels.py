@@ -192,7 +192,14 @@ class OwnerQuery(PydanticBase):
     phone : Optional[str]
         The phone number of the Owner(s).
     """
-    first_name: Optional[str] = Field(Query(None, description="The first name of the owner(s) you are looking for."))
-    last_name: Optional[str] = Field(Query(None, description="The last name of the owner(s) you are looking for."))
-    email: Optional[str] = Field(Query(None, description="The email address of the owner(s) you are looking for."))
-    phone: Optional[str] = Field(Query(None, description="The phone number of the owner(s) you are looking for."))
+    first_name: Optional[str] = Field(Query(None,
+                                            description="Get all owners with the given first name.",
+                                            example="Max"))
+    last_name: Optional[str] = Field(Query(None,
+                                           description="Get all owners with the given last name.",
+                                           example="Mustermann"))
+    email: Optional[str] = Field(Query(None,
+                                       description="Get all owners with the given email.",
+                                       example="mustermax@mail.com"))
+    phone: Optional[str] = Field(Query(None, description="Get all owners with the given phone-number.",
+                                       example="+49-123-123-45678"))

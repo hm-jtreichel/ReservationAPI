@@ -22,7 +22,6 @@ class Restaurant(Base):
         id (int): The unique identifier for the restaurant.
         name (str): The name of the restaurant.
         owner_id (int): The unique identifier of the restaurant owner.
-        address_id (int): The unique identifier of the restaurant address.
 
     Relationships:
         owner (Owner): The owner of the restaurant.
@@ -87,6 +86,7 @@ class Address(Base):
         postal_code (int): The postal code of the address.
         city (str): The city of the address.
         country_code (str): The country code of the address.
+        restaurant_id (int): The unique identifier of the restaurant associated with this address.
 
     Relationships:
         restaurant (Restaurant): The restaurant associated with the address.

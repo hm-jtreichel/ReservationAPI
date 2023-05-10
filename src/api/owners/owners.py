@@ -376,8 +376,9 @@ def create_restaurants(owner_id: int = Path(description="The ID of the owner of 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"The owner with the given ID <{owner_id}> does not exist")
 
-    restaurant_models = list(map(PydanticRestaurantNew.cast_to_model, new_restaurants))
-    # Set relationship of each added restaurant to the owner specified by the path-parameter
+    restaurant_models = list(map(
+        lambda new_restaurant: PydanticRestaurantNew.cast_to_model(new_restaurant, owner_id), new_restaurants
+    ))
     for restaurant_model in restaurant_models:
         restaurant_model.owner_id = owner_id
 
@@ -428,11 +429,12 @@ def create_restaurant(owner_id: int = Path(description="The ID of the owner of t
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Restaurant-ID <{restaurant_id}> is not available. Please choose another one.")
 
-    restaurant_model = PydanticRestaurantNew.cast_to_model(new_restaurant)
+    restaurant_model = PydanticRestaurantNew.cast_to_model(new_restaurant, owner_id)
     restaurant_model.id = restaurant_id
-    restaurant_model.owner_id = owner_id
 
     session.add(restaurant_model)
     session.commit()
 
-    return PydanticRestaurant.cast_from_model(restaurant_model)
+    added_restaurant = PydanticRestaurant.cast_from_model(restaurant_model)
+
+    return added_restaurant
