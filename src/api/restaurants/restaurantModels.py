@@ -37,12 +37,13 @@ class RestaurantNew(PydanticBase):
         extra = Extra.forbid
 
     @staticmethod
-    def cast_to_model(restaurant: RestaurantNew) -> RestaurantModel:
+    def cast_to_model(restaurant: RestaurantNew, owner_id: int) -> RestaurantModel:
         """
         Converts an instance of `RestaurantNew` to an instance of `RestaurantModel`.
 
         Args:
             restaurant: The `RestaurantNew` instance to be converted.
+            owner_id: The id (primary-key) of the owner of this restaurant (foreign key).
 
         Returns:
             An instance of `RestaurantModel` converted from the `RestaurantNew` instance.
@@ -51,6 +52,7 @@ class RestaurantNew(PydanticBase):
             name=restaurant.name,
             address=Address.cast_to_model(restaurant.address),
             business_hours=list(map(BusinessHour.cast_to_model, restaurant.business_hours)),
+            owner_id=owner_id
         )
         return restaurant_model
 
@@ -139,24 +141,23 @@ class RestaurantPut(PydanticBase):
         extra = Extra.forbid
 
     @staticmethod
-    def cast_to_model(restaurant: RestaurantPut) -> RestaurantModel:
+    def cast_to_model(restaurant_put: RestaurantPut) -> RestaurantModel:
         """
         Casts a RestaurantPut instance to a RestaurantModel instance.
 
         Args:
-            restaurant (RestaurantPut): The RestaurantPut instance to be cast.
+            restaurant_put (RestaurantPut): The RestaurantPut instance to be cast.
 
         Returns:
             RestaurantModel: The RestaurantModel instance resulting from the cast.
 
         """
-        get_existing_restaurant_model_qry = select(RestaurantModel).where(RestaurantModel.id == restaurant.id)
+        get_existing_restaurant_model_qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_put.id)
         restaurant_model = session.scalars(get_existing_restaurant_model_qry).first()
         # Update existing model
-        restaurant_model.name = restaurant.name
-        restaurant_model.address = Address.cast_to_model(restaurant.address)
-        restaurant_model.business_hours = list(map(BusinessHour.cast_to_model, restaurant.business_hours))
-
+        restaurant_model.name = restaurant_put.name
+        restaurant_model.address = Address.cast_to_model(restaurant_put.address)
+        restaurant_model.business_hours = list(map(BusinessHour.cast_to_model, restaurant_put.business_hours))
         return restaurant_model
 
 
@@ -173,13 +174,21 @@ class RestaurantQuery(PydanticBase):
         country_code (Optional[str]): The country code of the restaurant(s) to search for.
 
     """
-    name: Optional[str] = Field(Query(None, description="The name of the restaurant(s) you are looking for."))
-    owner_id: Optional[str] = Field(Query(None, description="The owner ID of the restaurant(s) you are looking for."))
-    street_name: Optional[str] = Field(Query(None, description="The street name of the restaurant(s) you are "
-                                                               "looking for."))
-    house_number: Optional[str] = Field(Query(None, description="The house number of the restaurant(s) you are "
-                                                                "looking for."))
-    postal_code: Optional[str] = Field(Query(None, description="The postal code of the restaurant(s) you are "
-                                                               "looking for."))
-    country_code: Optional[str] = Field(Query(None, description="The country code of the restaurant(s) you are "
-                                                                "looking for."))
+    name: Optional[str] = Field(Query(None,
+                                      description="Get all restaurants with the given name.",
+                                      example="Mustermampf"))
+    owner_id: Optional[int] = Field(Query(None,
+                                          description="Get all restaurants of an owner with the given ID.",
+                                          example=1))
+    street_name: Optional[str] = Field(Query(None,
+                                             description="Get all restaurants with the given street name.",
+                                             example="Musterstraße"))
+    house_number: Optional[str] = Field(Query(None,
+                                              description="Get all restaurants with the given house number.",
+                                              example="1A"))
+    postal_code: Optional[int] = Field(Query(None,
+                                             description="Get all restaurants with the given postal code.",
+                                             example=12345))
+    country_code: Optional[str] = Field(Query(None,
+                                              description="Get all restaurants with the given country code.",
+                                              example="DE"))
