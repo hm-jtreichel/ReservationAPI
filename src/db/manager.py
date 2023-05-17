@@ -2,6 +2,7 @@ from typing import Iterable
 
 from sqlalchemy import create_engine, Executable, ScalarResult
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.session import make_transient
 from sqlalchemy.pool import StaticPool
 
 # TODO: Engine using SQLite (currently connection + creation /
@@ -127,3 +128,22 @@ class SessionFacade:
         """
         for instance in instances:
             SessionFacade.delete(instance)
+
+    @staticmethod
+    def flush():
+        """
+        Flushes the session.
+        """
+        SessionFacade._session.flush()
+
+    @staticmethod
+    def make_transient(obj: object):
+        """
+        Returns a given object to a transient state.
+
+        Args:
+        -----
+        obj : object
+            The object to be deleted from the session.
+        """
+        make_transient(obj)

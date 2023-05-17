@@ -44,10 +44,8 @@ entity Table {
     * restaurant_id : number <<FK>>
     * name : varchar
     * seats : number
-    * min_seats_required_for_reservation : number
-    disabled_until : datetime
+    * min_guests_required_for_reservation : number
 }
-note bottom of Table : <disabled_until> allows the owner to disable certain\ntables until a specified point in time if\nthey are - for example - short on staff.
 
 entity Reservation {
     * id : number <<generated, PK>>

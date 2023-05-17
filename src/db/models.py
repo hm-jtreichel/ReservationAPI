@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Optional
 from datetime import datetime, time
 
-from sqlalchemy import ForeignKey, CheckConstraint
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -126,11 +126,6 @@ class BusinessHour(Base):
     """
     __tablename__ = "business_hour"
 
-    # TODO: Check if works with PostgreSQL
-    __table_args__ = tuple(
-        CheckConstraint("weekday BETWEEN 0 AND 6")
-    )
-
     id: Mapped[int] = mapped_column(primary_key=True)
     weekday: Mapped[int]
     open_time: Mapped[time]
@@ -154,7 +149,7 @@ class Table(Base):
         id (int): The unique identifier for the table.
         name (str): The name of the table.
         seats (int): The number of seats at the table.
-        min_seats_required_for_reservation (int): The minimum number of seats required for a reservation at the table.
+        min_guests_required_for_reservation (int): The minimum number of guests required for a reservation at the table.
         restaurant_id (int): The unique identifier of the restaurant associated with the table.
 
     Relationships:
@@ -166,7 +161,7 @@ class Table(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
     seats: Mapped[int]
-    min_seats_required_for_reservation: Mapped[int]
+    min_guests_required_for_reservation: Mapped[int]
 
     restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurant.id"))
 

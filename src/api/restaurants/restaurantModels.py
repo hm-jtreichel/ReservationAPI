@@ -10,6 +10,7 @@ from pydantic import BaseModel as PydanticBase, Field, Extra
 from fastapi import Query
 from sqlalchemy import select
 
+from ..util import format_description_with_example
 from ...db.manager import SessionFacade
 from ...db.models import Restaurant as RestaurantModel
 from .addressModels import Address
@@ -36,33 +37,29 @@ class RestaurantNew(PydanticBase):
         }
         extra = Extra.forbid
 
-    @staticmethod
-    def cast_to_model(restaurant: RestaurantNew, owner_id: int) -> RestaurantModel:
+    def cast_to_model(self, owner_id: int) -> RestaurantModel:
         """
         Converts an instance of `RestaurantNew` to an instance of `RestaurantModel`.
 
         Args:
-            restaurant: The `RestaurantNew` instance to be converted.
             owner_id: The id (primary-key) of the owner of this restaurant (foreign key).
 
         Returns:
             An instance of `RestaurantModel` converted from the `RestaurantNew` instance.
         """
         restaurant_model = RestaurantModel(
-            name=restaurant.name,
-            address=Address.cast_to_model(restaurant.address),
-            business_hours=list(map(BusinessHour.cast_to_model, restaurant.business_hours)),
+            name=self.name,
+            address=self.address.cast_to_model(),
+            business_hours=[business_hour.cast_to_model() for business_hour in self.business_hours],
             owner_id=owner_id
         )
         return restaurant_model
 
-    @staticmethod
-    def cast_to_put(restaurant: RestaurantNew, restaurant_id: int) -> RestaurantPut:
+    def cast_to_put(self, restaurant_id: int) -> RestaurantPut:
         """
         Converts an instance of `RestaurantNew` to an instance of `RestaurantPut`.
 
         Args:
-            restaurant: The `RestaurantNew` instance to be converted.
             restaurant_id: The id (primary-key) of the restaurant.
 
         Returns:
@@ -70,9 +67,9 @@ class RestaurantNew(PydanticBase):
         """
         restaurant_put = RestaurantPut(
             id=restaurant_id,
-            name=restaurant.name,
-            address=Address.cast_to_model(restaurant.address),
-            business_hours=list(map(BusinessHour.cast_to_model, restaurant.business_hours)),
+            name=self.name,
+            address=self.address.cast_to_model(),
+            business_hours=[business_hour.cast_to_model() for business_hour in self.business_hours]
         )
         return restaurant_put
 
@@ -115,7 +112,8 @@ class Restaurant(PydanticBase):
             name=restaurant_model.name,
             owner_id=restaurant_model.owner_id,
             address=Address.cast_from_model(restaurant_model.address),
-            business_hours=list(map(BusinessHour.cast_from_model, restaurant_model.business_hours))
+            business_hours=[BusinessHour.cast_from_model(business_hour_model)
+                            for business_hour_model in restaurant_model.business_hours]
         )
         return restaurant
 
@@ -124,7 +122,7 @@ class RestaurantPut(PydanticBase):
     """
     Represents a restaurant that can or will be updated in the system.
     """
-    id: int
+    id: int = Field(gt=0)
     name: str
     address: Address
     business_hours: List[BusinessHour]
@@ -140,24 +138,20 @@ class RestaurantPut(PydanticBase):
         }
         extra = Extra.forbid
 
-    @staticmethod
-    def cast_to_model(restaurant_put: RestaurantPut) -> RestaurantModel:
+    def cast_to_model(self) -> RestaurantModel:
         """
         Casts a RestaurantPut instance to a RestaurantModel instance.
-
-        Args:
-            restaurant_put (RestaurantPut): The RestaurantPut instance to be cast.
 
         Returns:
             RestaurantModel: The RestaurantModel instance resulting from the cast.
 
         """
-        get_existing_restaurant_model_qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_put.id)
+        get_existing_restaurant_model_qry = select(RestaurantModel).where(RestaurantModel.id == self.id)
         restaurant_model = session.scalars(get_existing_restaurant_model_qry).first()
         # Update existing model
-        restaurant_model.name = restaurant_put.name
-        restaurant_model.address = Address.cast_to_model(restaurant_put.address)
-        restaurant_model.business_hours = list(map(BusinessHour.cast_to_model, restaurant_put.business_hours))
+        restaurant_model.name = self.name
+        restaurant_model.address = self.address.cast_to_model()
+        restaurant_model.business_hours = [business_hour.cast_to_model() for business_hour in self.business_hours]
         return restaurant_model
 
 
@@ -175,20 +169,20 @@ class RestaurantQuery(PydanticBase):
 
     """
     name: Optional[str] = Field(Query(None,
-                                      description="Get all restaurants with the given name.",
-                                      example="Mustermampf"))
+                                      description=format_description_with_example(
+                                          "Get all restaurants with the given name.", "Mustermampf")))
     owner_id: Optional[int] = Field(Query(None,
-                                          description="Get all restaurants of an owner with the given ID.",
-                                          example=1))
+                                          description=format_description_with_example(
+                                              "Get all restaurants of an owner with the given ID.", 1)))
     street_name: Optional[str] = Field(Query(None,
-                                             description="Get all restaurants with the given street name.",
-                                             example="Musterstraße"))
+                                             description=format_description_with_example(
+                                                 "Get all restaurants with the given street name.", "Musterstraße")))
     house_number: Optional[str] = Field(Query(None,
-                                              description="Get all restaurants with the given house number.",
-                                              example="1A"))
+                                              description=format_description_with_example(
+                                                  "Get all restaurants with the given house number.", "1A")))
     postal_code: Optional[int] = Field(Query(None,
-                                             description="Get all restaurants with the given postal code.",
-                                             example=12345))
+                                             description=format_description_with_example(
+                                                 "Get all restaurants with the given postal code.", 12345)))
     country_code: Optional[str] = Field(Query(None,
-                                              description="Get all restaurants with the given country code.",
-                                              example="DE"))
+                                              description=format_description_with_example(
+                                                  "Get all restaurants with the given country code.", "DE")))

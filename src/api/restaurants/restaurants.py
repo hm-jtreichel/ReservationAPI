@@ -1,6 +1,7 @@
 from typing import List, Union
 
 from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 
 from ..util import validate_ids_in_put_request
@@ -13,6 +14,10 @@ from .restaurantModels import Restaurant as PydanticRestaurant, \
 from ..tables.tableModels import Table as PydanticTable, \
     TableNew as PydanticTableNew, \
     TableModel
+from ..reservations.reservationModels import Reservation as PydanticReservation, \
+    ReservationNew as PydanticReservationNew, \
+    ReservationModel, \
+    VALIDATION_ERRORS_RESTAURANT
 from .addressModels import AddressModel
 
 router = APIRouter(
@@ -68,7 +73,7 @@ def get_restaurants(restaurant_query: PydanticRestaurantQuery = Depends()) -> Li
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Restaurants for your specified query parameters do not exist")
 
-    restaurants = list(map(PydanticRestaurant.cast_from_model, restaurant_models))
+    restaurants = [PydanticRestaurant.cast_from_model(restaurant_model) for restaurant_model in restaurant_models]
 
     return restaurants
 
@@ -94,11 +99,11 @@ def get_restaurant(restaurant_id: int = Path(description="The ID of the restaura
         HTTPException: If no restaurant with the provided ID is found.
     """
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
-    restaurant = session.scalars(qry).first()
+    restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Restaurants with ID <{restaurant_id}> does not exist")
+                            detail=f"A restaurant with the given ID <{restaurant_id}> does not exist")
 
     return PydanticRestaurant.cast_from_model(restaurant)
 
@@ -122,7 +127,7 @@ def update_restaurants(restaurants_to_update: List[PydanticRestaurantPut] = Body
         List[PydanticRestaurant]: The updated restaurant objects.
 
     Raises:
-        HTTPException: If the request-body is empty or if one or more restaurant objects in the list has an invalid ID.
+        HTTPException: If the request-body is empty or if one or more restaurant objects in the list have an invalid ID.
 
     """
     if not restaurants_to_update:
@@ -131,11 +136,12 @@ def update_restaurants(restaurants_to_update: List[PydanticRestaurantPut] = Body
 
     validate_ids_in_put_request(restaurants_to_update, RestaurantModel)
 
-    restaurant_models = list(map(PydanticRestaurantPut.cast_to_model, restaurants_to_update))
+    restaurant_models = [restaurant_to_update.cast_to_model() for restaurant_to_update in restaurants_to_update]
     session.merge_all(restaurant_models)
     session.commit()
 
-    updated_restaurants = list(map(PydanticRestaurant.cast_from_model, restaurant_models))
+    updated_restaurants = [PydanticRestaurant.cast_from_model(restaurant_model)
+                           for restaurant_model in restaurant_models]
 
     return updated_restaurants
 
@@ -171,16 +177,16 @@ def update_restaurant(restaurant_id: int = Path(description="The ID of the resta
                                        f"ID <{restaurant_to_update.id}> of the restaurant object in the request-body")
 
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
-    restaurant = session.scalars(qry).first()
+    restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"There is no restaurant for the given ID <{restaurant_id}>")
 
     if type(restaurant_to_update) == PydanticRestaurantNew:
-        restaurant_to_update = PydanticRestaurantNew.cast_to_put(restaurant_to_update, restaurant_id)
+        restaurant_to_update = restaurant_to_update.cast_to_put(restaurant_id)
 
-    restaurant_model = PydanticRestaurantPut.cast_to_model(restaurant_to_update)
+    restaurant_model = restaurant_to_update.cast_to_model()
 
     session.merge(restaurant_model)
     session.commit()
@@ -195,7 +201,7 @@ def update_restaurant(restaurant_id: int = Path(description="The ID of the resta
                response_description="The deleted restaurants")
 def delete_restaurants() -> List[PydanticRestaurant]:
     """
-    Delete all restaurants in the database.
+    Delete all restaurants.
     \f
     Returns:
         List[PydanticRestaurant]: The deleted restaurants.
@@ -206,7 +212,7 @@ def delete_restaurants() -> List[PydanticRestaurant]:
     session.delete_all(restaurants)
     session.commit()
 
-    deleted_restaurants = list(map(PydanticRestaurant.cast_from_model, restaurants))
+    deleted_restaurants = [PydanticRestaurant.cast_from_model(restaurant_model) for restaurant_model in restaurants]
 
     return deleted_restaurants
 
@@ -215,7 +221,7 @@ def delete_restaurants() -> List[PydanticRestaurant]:
                summary="Delete a single restaurant with a given ID in the database",
                response_description="The deleted restaurant",
                responses={
-                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
+                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"}
                })
 def delete_restaurant(restaurant_id: int = Path(description="The ID of the restaurant to be deleted.", gt=0)
                       ) -> PydanticRestaurant:
@@ -232,7 +238,7 @@ def delete_restaurant(restaurant_id: int = Path(description="The ID of the resta
         HTTPException: If the restaurant with the given ID does not exist.
     """
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
-    restaurant = session.scalars(qry).first()
+    restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -241,7 +247,9 @@ def delete_restaurant(restaurant_id: int = Path(description="The ID of the resta
     session.delete(restaurant)
     session.commit()
 
-    return PydanticRestaurant.cast_from_model(restaurant)
+    deleted_restaurant = PydanticRestaurant.cast_from_model(restaurant)
+
+    return deleted_restaurant
 
 
 @router.post('/{restaurant_id}/tables',
@@ -272,20 +280,18 @@ def create_tables_for_restaurant(restaurant_id: int = Path(description="The ID o
                             detail="No (table-)objects present in the list request-body")
 
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
-    restaurant = session.scalars(qry).first()
+    restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"The restaurant with the given ID <{restaurant_id}> does not exist")
 
-    table_models = list(map(
-        lambda new_table: PydanticTableNew.cast_to_model(new_table, restaurant_id), tables_to_create
-    ))
+    table_models = [table_to_create.cast_to_model(restaurant_id) for table_to_create in tables_to_create]
 
     session.add_all(table_models)
     session.commit()
 
-    added_tables = list(map(PydanticTable.cast_from_model, table_models))
+    added_tables = [PydanticTable.cast_from_model(table_model) for table_model in table_models]
 
     return added_tables
 
@@ -316,20 +322,20 @@ def create_table_for_restaurant(restaurant_id: int = Path(description="The ID of
         HTTPException: If the restaurant with the given ID does not exist or if the table ID is not available.
     """
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
-    restaurant = session.scalars(qry).first()
+    restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"The restaurant with the given ID <{restaurant_id}> does not exist")
 
     qry = select(TableModel).where(TableModel.id == table_id)
-    existing_table = session.scalars(qry).first()
+    existing_table: TableModel = session.scalars(qry).first()
 
     if existing_table:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Table-ID <{table_id}> is not available. Please choose another one.")
 
-    table_model = PydanticTableNew.cast_to_model(table_to_create, restaurant_id)
+    table_model = table_to_create.cast_to_model(restaurant_id)
     table_model.id = table_id
 
     session.add(table_model)
@@ -338,3 +344,183 @@ def create_table_for_restaurant(restaurant_id: int = Path(description="The ID of
     added_table = PydanticTable.cast_from_model(table_model)
 
     return added_table
+
+
+@router.post('/{restaurant_id}/reservations',
+             summary="Create one or multiple reservations",
+             response_description="The created reservations",
+             responses={
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list or reservations "
+                                                              "not possible)"},
+                 status.HTTP_409_CONFLICT: {"description": "At least one reservation is not possible for the given "
+                                                           "restaurant"}
+             },
+             tags=['reservations'])
+def create_reservations_for_restaurant(
+        restaurant_id: int = Path(description="The ID of the restaurant of the reservation", gt=0),
+        reservations_to_create: List[PydanticReservationNew] = Body(description="The reservations you want to create "
+                                                                                "(sorted by priority descending)")
+        ) -> List[PydanticReservation]:
+    """
+    Create one or multiple reservations for a restaurant and assign them to a valid table
+    \f
+    Args:
+        restaurant_id (int): The ID of the restaurant of the reservation.
+        reservations_to_create (List[PydanticReservationNew]): The reservations you want to create
+                                                               (sorted by priority descending).
+
+    Returns:
+        List[PydanticReservation]: The created reservations.
+
+    Raises:
+        HTTPException: If the request-body is invalid (e.g., empty list or reservations not possible) or
+                       the restaurant with the given ID does not exist.
+    """
+    if not reservations_to_create:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="No (reservation-)objects present in the list request-body")
+
+    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    restaurant: RestaurantModel = session.scalars(qry).first()
+
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"The restaurant with the given ID <{restaurant_id}> does not exist")
+
+    created_reservation_models = []
+    invalid_reservations = []
+    for reservation_to_create in reservations_to_create:
+        valid_table_id = reservation_to_create.validate_for_restaurant(restaurant)
+        if valid_table_id > 0:
+            created_reservation = reservation_to_create.cast_to_model(valid_table_id)
+            session.add(created_reservation)
+            session.flush()
+            created_reservation_models.append(created_reservation)
+        else:
+            invalid_reservations.append(reservation_to_create)
+
+    if invalid_reservations:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail={
+                                "message": "Unable to find an available table for all provided reservations because "
+                                           "of conflicts. Your provided reservations might also overlap. "
+                                           "For additional information you can verify a single reservation at the "
+                                           "'restaurants/{restaurant_id}/validate-reservation'-endpoint.",
+                                "invalidReservations": jsonable_encoder(invalid_reservations)
+                            })
+
+    session.commit()
+
+    added_reservations = [PydanticReservation.cast_from_model(created_reservation_model)
+                          for created_reservation_model in created_reservation_models]
+
+    return added_reservations
+
+
+@router.post('/{restaurant_id}/reservations/{reservation_id}',
+             summary="Create a new reservation with a specified ID for a restaurant.",
+             response_description="The created reservation",
+             responses={
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_409_CONFLICT: {"description": "Reservation is not possible for the given restaurant"}
+             },
+             tags=['reservations'])
+def create_reservation_for_restaurant(
+        restaurant_id: int = Path(description="The ID of the restaurant of the reservation", gt=0),
+        reservation_to_create: PydanticReservationNew = Body(description="The reservation you want to "
+                                                                         "create"),
+        reservation_id: int = Path(description="The ID of the reservation you want to create", gt=0)
+        ) -> PydanticReservation:
+    """
+    Create a new reservation with a specified ID for a restaurant.
+    \f
+    Args:
+        restaurant_id (int): The ID of the restaurant of the reservation.
+        reservation_to_create (PydanticReservationNew): The reservation you want to create.
+        reservation_id (int): The ID of the reservation you want to create.
+
+    Returns:
+        PydanticReservation: The created reservation.
+
+    Raises:
+        HTTPException: If the request is invalid (e.g., ID not available), the restaurant with the given ID does not
+                       exist, or an available table cannot be found for the provided reservation.
+    """
+    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    restaurant: RestaurantModel = session.scalars(qry).first()
+
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"The restaurant with the given ID <{restaurant_id}> does not exist")
+
+    qry = select(ReservationModel).where(ReservationModel.id == reservation_id)
+    existing_reservation: ReservationModel = session.scalars(qry).first()
+
+    if existing_reservation:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Reservation-ID <{reservation_id}> is not available. Please choose another one.")
+
+    valid_table_id = reservation_to_create.validate_for_restaurant(restaurant)
+    if valid_table_id < 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Unable to find an available table for the provided reservation because of "
+                                   "conflicts. For additional information you can verify your reservation at the "
+                                   "'restaurants/{restaurant_id}/validate-reservation'-endpoint.")
+
+    reservation_model = reservation_to_create.cast_to_model(valid_table_id)
+    reservation_model.id = reservation_id
+
+    session.add(reservation_model)
+    session.commit()
+
+    added_reservation = PydanticReservation.cast_from_model(reservation_model)
+
+    return added_reservation
+
+
+@router.post('/{restaurant_id}/validate-reservation',
+             summary="Validates a reservation for a restaurant.",
+             response_description="An available table of the restaurant for the reservation.",
+             responses={
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_409_CONFLICT: {"description": "Reservation is not possible for the given restaurant"}
+             },
+             tags=['reservations'])
+def validate_reservation_for_restaurant(
+        restaurant_id: int = Path(description="The ID of the restaurant of the reservation", gt=0),
+        reservation_to_validate: PydanticReservationNew = Body(description="The reservation you want to validate"),
+        ) -> PydanticTable:
+    """
+    Validates a reservation for a restaurant.
+    \f
+    Args:
+        restaurant_id (int): The ID of the restaurant for the reservation.
+        reservation_to_validate (PydanticReservationNew): The reservation you want to validate.
+
+    Returns:
+        PydanticTable: An available table of the restaurant for the reservation.
+
+    Raises:
+        HTTPException:
+            - status_code 400: If the restaurant with the given ID does not exist.
+            - status_code 409: If the reservation is not possible for the given restaurant.
+    """
+    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    restaurant: RestaurantModel = session.scalars(qry).first()
+
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"The restaurant with the given ID <{restaurant_id}> does not exist")
+
+    valid_table_id = reservation_to_validate.validate_for_restaurant(restaurant)
+    if valid_table_id < 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=VALIDATION_ERRORS_RESTAURANT[valid_table_id])
+
+    qry = select(TableModel).where(TableModel.id == valid_table_id)
+    valid_table_model: TableModel = session.scalars(qry).first()
+
+    valid_table = PydanticTable.cast_from_model(valid_table_model)
+
+    return valid_table

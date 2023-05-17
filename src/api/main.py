@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from starlette.responses import RedirectResponse
 
 from .owners import owners
 from .restaurants import restaurants
@@ -38,11 +39,12 @@ tags_metadata = [
 app = FastAPI(
     title="ReservationAPI",
     description=description,
-    version="0.1",
+    version="0.2",
     openapi_tags=tags_metadata,
     swagger_ui_parameters={
         "defaultModelsExpandDepth": -1,  # Hide schemas from /docs
-        "operationsSorter": "method"  # Sort endpoints by their methods
+        "operationsSorter": "method",  # Sort endpoints by their methods
+        "docExpansion": None
     },
     redoc_url=None
 )
@@ -51,3 +53,8 @@ app.include_router(owners.router)
 app.include_router(restaurants.router)
 app.include_router(tables.router)
 app.include_router(reservations.router)
+
+
+@app.get('/', include_in_schema=False)
+def redirect_to_docs():
+    return RedirectResponse(url="/docs")
