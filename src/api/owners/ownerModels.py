@@ -11,6 +11,7 @@ from pydantic import BaseModel as PydanticBase, Field, Extra
 from fastapi import Query
 from sqlalchemy import select
 
+from ..util import format_description_with_example
 from ...db.manager import SessionFacade
 from ...db.models import Owner as OwnerModel
 
@@ -37,15 +38,9 @@ class OwnerNew(PydanticBase):
         }
         extra = Extra.forbid
 
-    @staticmethod
-    def cast_to_model(owner: OwnerNew) -> OwnerModel:
+    def cast_to_model(self) -> OwnerModel:
         """
         Converts a PydanticOwnerNew instance to an OwnerModel instance.
-
-        Parameters:
-        -----------
-        owner : OwnerNew
-            The PydanticOwnerNew instance to convert.
 
         Returns:
         --------
@@ -53,20 +48,18 @@ class OwnerNew(PydanticBase):
             The converted OwnerModel instance.
         """
         owner_model = OwnerModel(
-            first_name=owner.first_name,
-            last_name=owner.last_name,
-            email=owner.email,
-            phone=owner.phone
+            first_name=self.first_name,
+            last_name=self.last_name,
+            email=self.email,
+            phone=self.phone
         )
         return owner_model
 
-    @staticmethod
-    def cast_to_put(owner: OwnerNew, owner_id: int) -> OwnerPut:
+    def cast_to_put(self, owner_id: int) -> OwnerPut:
         """
         Converts an instance of `OwnerNew` to an instance of `OwnerPut`.
 
         Args:
-            owner: The `OwnerNew` instance to be converted.
             owner_id: The id (primary-key) of the restaurant.
 
         Returns:
@@ -74,10 +67,10 @@ class OwnerNew(PydanticBase):
         """
         owner_put = OwnerPut(
             id=owner_id,
-            first_name=owner.first_name,
-            last_name=owner.last_name,
-            email=owner.email,
-            phone=owner.phone
+            first_name=self.first_name,
+            last_name=self.last_name,
+            email=self.email,
+            phone=self.phone
         )
         return owner_put
 
@@ -133,7 +126,7 @@ class OwnerPut(PydanticBase):
     """
     Pydantic model representing an Owner instance to update.
     """
-    id: int
+    id: int = Field(gt=0)
     first_name: str
     last_name: str
     email: str
@@ -151,28 +144,22 @@ class OwnerPut(PydanticBase):
         }
         extra = Extra.forbid
 
-    @staticmethod
-    def cast_to_model(owner: OwnerPut) -> OwnerModel:
+    def cast_to_model(self) -> OwnerModel:
         """
         Converts a PydanticOwnerPut instance to an OwnerModel instance.
-
-        Parameters:
-        -----------
-        owner : Owner
-            The PydanticOwnerPut instance to convert.
 
         Returns:
         --------
         OwnerModel
             The converted OwnerModel instance.
         """
-        get_existing_owner_model_qry = select(OwnerModel).where(OwnerModel.id == owner.id)
+        get_existing_owner_model_qry = select(OwnerModel).where(OwnerModel.id == self.id)
         owner_model = session.scalars(get_existing_owner_model_qry).first()
 
-        owner_model.first_name = owner.first_name
-        owner_model.last_name = owner.last_name
-        owner_model.email = owner.email
-        owner_model.phone = owner.phone
+        owner_model.first_name = self.first_name
+        owner_model.last_name = self.last_name
+        owner_model.email = self.email
+        owner_model.phone = self.phone
 
         return owner_model
 
@@ -193,13 +180,13 @@ class OwnerQuery(PydanticBase):
         The phone number of the Owner(s).
     """
     first_name: Optional[str] = Field(Query(None,
-                                            description="Get all owners with the given first name.",
-                                            example="Max"))
+                                            description=format_description_with_example(
+                                                "Get all owners with the given first name.", "Max")))
     last_name: Optional[str] = Field(Query(None,
-                                           description="Get all owners with the given last name.",
-                                           example="Mustermann"))
+                                           description=format_description_with_example(
+                                               "Get all owners with the given last name.", "Mustermann")))
     email: Optional[str] = Field(Query(None,
-                                       description="Get all owners with the given email.",
-                                       example="mustermax@mail.com"))
-    phone: Optional[str] = Field(Query(None, description="Get all owners with the given phone-number.",
-                                       example="+49-123-123-45678"))
+                                       description=format_description_with_example(
+                                           "Get all owners with the given email.", "mustermax@mail.com")))
+    phone: Optional[str] = Field(Query(None, description=format_description_with_example(
+        "Get all owners with the given phone-number.", "+49-123-123-45678")))

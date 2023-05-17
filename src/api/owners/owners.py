@@ -71,7 +71,7 @@ def get_owners(owner_query: PydanticOwnerQuery = Depends()) -> List[PydanticOwne
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Owners for your specified query parameters do not exist")
 
-    owners = list(map(PydanticOwner.cast_from_model, owner_models))
+    owners = [PydanticOwner.cast_from_model(owner_model) for owner_model in owner_models]
 
     return owners
 
@@ -105,10 +105,10 @@ def get_owner(owner_id: int = Path(description="The ID of the owner you are look
     """
     qry = select(OwnerModel).where(OwnerModel.id == owner_id)
 
-    owner_model = session.scalars(qry).first()
+    owner_model: OwnerModel = session.scalars(qry).first()
     if not owner_model:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"An owner with the given id <{owner_id}> does not exist")
+                            detail=f"An owner with the given ID <{owner_id}> does not exist")
 
     owner = PydanticOwner.cast_from_model(owner_model)
     return owner
@@ -144,12 +144,12 @@ def create_owners(new_owners: List[PydanticOwnerNew] = Body(description="The own
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (owner-)objects present in the list request-body")
 
-    owner_models = list(map(PydanticOwnerNew.cast_to_model, new_owners))
+    owner_models = [new_owner.cast_to_model() for new_owner in new_owners]
     session.add_all(owner_models)
     session.commit()
     # Owners now have an ID set on the database.
 
-    added_owners = list(map(PydanticOwner.cast_from_model, owner_models))
+    added_owners = [PydanticOwner.cast_from_model(owner_model) for owner_model in owner_models]
 
     return added_owners
 
@@ -189,7 +189,7 @@ def create_owner(owner_id: int = Path(description="The ID of the new owner", gt=
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Owner-ID <{owner_id}> is not available. Please choose another one.")
 
-    owner_model = PydanticOwnerNew.cast_to_model(new_owner)
+    owner_model = new_owner.cast_to_model()
     owner_model.id = owner_id
 
     session.add(owner_model)
@@ -226,11 +226,11 @@ def update_owners(owners_to_update: List[PydanticOwnerPut] = Body(description="T
 
     validate_ids_in_put_request(owners_to_update, OwnerModel)
 
-    owner_models = list(map(PydanticOwnerPut.cast_to_model, owners_to_update))
+    owner_models = [owner_to_update.cast_to_model() for owner_to_update in owners_to_update]
     session.merge_all(owner_models)
     session.commit()
 
-    updated_owners = list(map(PydanticOwner.cast_from_model, owner_models))
+    updated_owners = [PydanticOwner.cast_from_model(owner_model) for owner_model in owner_models]
 
     return updated_owners
 
@@ -266,16 +266,16 @@ def update_owner(owner_id: int = Path(description="The ID of the owner to update
                                        f"ID <{owner_to_update.id}> of the owner object in the request-body")
 
     qry = select(OwnerModel).where(OwnerModel.id == owner_id)
-    owner = session.scalars(qry).first()
+    owner: OwnerModel = session.scalars(qry).first()
 
     if not owner:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"There is no owner for the given ID <{owner_id}>")
 
     if type(owner_to_update) == PydanticOwnerNew:
-        owner_to_update = PydanticOwnerNew.cast_to_put(owner_to_update, owner_id)
+        owner_to_update = owner_to_update.cast_to_put(owner_id)
 
-    owner_model = PydanticOwnerPut.cast_to_model(owner_to_update)
+    owner_model = owner_to_update.cast_to_model()
 
     session.merge(owner_model)
     session.commit()
@@ -290,7 +290,7 @@ def update_owner(owner_id: int = Path(description="The ID of the owner to update
                response_description="The deleted owners")
 def delete_owners() -> List[PydanticOwner]:
     """
-    Delete all owners in the database.
+    Delete all owners.
     \f
     Returns:
         List[PydanticOwner]: A list of deleted owner objects.
@@ -301,7 +301,7 @@ def delete_owners() -> List[PydanticOwner]:
     session.delete_all(existing_owners)
     session.commit()
 
-    deleted_owners = list(map(PydanticOwner.cast_from_model, existing_owners))
+    deleted_owners = [PydanticOwner.cast_from_model(existing_owner) for existing_owner in existing_owners]
 
     return deleted_owners
 
@@ -310,11 +310,11 @@ def delete_owners() -> List[PydanticOwner]:
                summary="Delete an owner with a specified ID",
                response_description="The deleted owner",
                responses={
-                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
+                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"}
                })
 def delete_owner(owner_id: int = Path(description="The ID of the owner to delete", gt=0)) -> PydanticOwner:
     """
-    Delete an owner with a specified ID from the database.
+    Delete an owner with a specified ID.
     \f
     Args:
         owner_id (int): The ID of the owner to delete.
@@ -326,7 +326,7 @@ def delete_owner(owner_id: int = Path(description="The ID of the owner to delete
         HTTPException: If the owner ID is invalid.
     """
     qry = select(OwnerModel).where(OwnerModel.id == owner_id)
-    owner = session.scalars(qry).first()
+    owner: OwnerModel = session.scalars(qry).first()
 
     if not owner:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -370,22 +370,20 @@ def create_restaurants(owner_id: int = Path(description="The ID of the owner of 
                             detail="No (restaurant-)objects present in the list request-body")
 
     qry = select(OwnerModel).where(OwnerModel.id == owner_id)
-    owner = session.scalars(qry).first()
+    owner: OwnerModel = session.scalars(qry).first()
 
     if not owner:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"The owner with the given ID <{owner_id}> does not exist")
 
-    restaurant_models = list(map(
-        lambda new_restaurant: PydanticRestaurantNew.cast_to_model(new_restaurant, owner_id), new_restaurants
-    ))
+    restaurant_models = [new_restaurant.cast_to_model(owner_id) for new_restaurant in new_restaurants]
     for restaurant_model in restaurant_models:
         restaurant_model.owner_id = owner_id
 
     session.add_all(restaurant_models)
     session.commit()
 
-    added_restaurants = list(map(PydanticRestaurant.cast_from_model, restaurant_models))
+    added_restaurants = [PydanticRestaurant.cast_from_model(restaurant_model) for restaurant_model in restaurant_models]
 
     return added_restaurants
 
@@ -417,19 +415,19 @@ def create_restaurant(owner_id: int = Path(description="The ID of the owner of t
 
     """
     qry = select(OwnerModel).where(OwnerModel.id == owner_id)
-    owner = session.scalars(qry).first()
+    owner: OwnerModel = session.scalars(qry).first()
 
     if not owner:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"The owner with the given ID <{owner_id}> does not exist")
 
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
-    existing_restaurant = session.scalars(qry).first()
+    existing_restaurant: RestaurantModel = session.scalars(qry).first()
     if existing_restaurant:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Restaurant-ID <{restaurant_id}> is not available. Please choose another one.")
 
-    restaurant_model = PydanticRestaurantNew.cast_to_model(new_restaurant, owner_id)
+    restaurant_model = new_restaurant.cast_to_model(owner_id)
     restaurant_model.id = restaurant_id
 
     session.add(restaurant_model)

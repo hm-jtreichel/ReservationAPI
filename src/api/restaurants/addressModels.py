@@ -4,7 +4,7 @@ This module defines the `Address` class which represents the address of a restau
 
 from __future__ import annotations
 
-from pydantic import BaseModel as PydanticBase, Extra
+from pydantic import BaseModel as PydanticBase, Extra, Field
 from ...db.models import Address as AddressModel
 
 
@@ -14,7 +14,7 @@ class Address(PydanticBase):
     """
     street_name: str
     house_number: str
-    postal_code: int
+    postal_code: int = Field(gt=0)
     city: str
     country_code: str
 
@@ -30,23 +30,19 @@ class Address(PydanticBase):
         }
         extra = Extra.forbid
 
-    @staticmethod
-    def cast_to_model(address: Address) -> AddressModel:
+    def cast_to_model(self) -> AddressModel:
         """
         Casts an `Address` object to a `AddressModel` object.
-
-        Args:
-            address (Address): The `Address` object to be cast.
 
         Returns:
             AddressModel: The corresponding `AddressModel` object.
         """
         address_model = AddressModel(
-            street_name=address.street_name,
-            house_number=address.house_number,
-            postal_code=address.postal_code,
-            city=address.city,
-            country_code=address.country_code
+            street_name=self.street_name,
+            house_number=self.house_number,
+            postal_code=self.postal_code,
+            city=self.city,
+            country_code=self.country_code
         )
         return address_model
 
