@@ -1,0 +1,85 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+package api {
+    package owners as ownersModule {
+        package ownerModels {
+            class OwnerNew {
+                first_name: str
+                last_name: str
+                email: str
+                phone: Optional[str]
+                cast_to_model()
+                cast_to_put(owner_id: int)
+            }
+            class Owner {
+                id: int
+                first_name: str
+                last_name: str
+                email: str
+                phone: Optional[str]
+               cast_from_model(owner_model: OwnerModel) <<static>>
+            }
+            class OwnerPut {
+                id: int
+                first_name: str
+                last_name: str
+                email: str
+                phone: Optional[str]
+                cast_to_model()
+            }
+            class OwnerQuery {
+                first_name: Optional[str]
+                last_name: Optional[str]
+                email_name: Optional[str]
+                phone: Optional[str]
+            }
+
+            OwnerNew .r.> OwnerPut : <<instantiate>>
+        }
+        class owners {
+            get_owners(owner_query: OwnerQuery) -> List[Owner]
+            get_owner(owner_id: int ) -> Owner
+            create_owners(new_owners: List[OwnerNew]) -> List[Owner]
+            create_owner(owner_id: int, new_owner: OwnerNew) -> Owner
+            update_owners(owners_to_update: List[OwnerPut]) -> List[Owner]
+            update_owner(owner_id: int, owner_to_update: Union[OwnerPut, OwnerNew]) -> Owner
+            delete_owners() -> List[Owner]
+            delete_owner(owner_id: int) -> Owner
+            create_restaurants(owner_id: int, new_restaurants: List[RestaurantNew]) -> List[Restaurant]
+            create_restaurant(owner_id: int, restaurant_id: int, new_restaurant: RestaurantNew) -> Restaurant
+        }
+
+        owners .u.> Owner : <<instantiate>>
+    }
+
+    package restaurants as restaurantModule {
+        package restaurantModels {
+            class Restaurant
+        }
+    }
+
+    owners ..> Restaurant : <<instantiate>>
+}
+
+package pydantic {
+    class BaseModel
+}
+
+package db {
+    class OwnerModel
+}
+
+
+
+BaseModel -d-|> Owner
+BaseModel -d-|> OwnerNew
+BaseModel -d-|> OwnerPut
+BaseModel -d-|> OwnerQuery
+
+OwnerPut .u.> OwnerModel : <<instantiate>>
+OwnerNew .u.> OwnerModel : <<instantiate>>
+
+
+
+@enduml
