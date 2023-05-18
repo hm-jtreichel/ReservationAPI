@@ -1,0 +1,60 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+actor user
+
+participant ":main <<fastapi>>" as main
+participant "reservation_to_create:ReservationNew" as reservation_to_create
+participant ":tables" as tables
+participant "session:SessionWrapper" as session
+participant "table:TableModel" as table
+participant "reservation_model:ReservationModel" as reservation_model
+participant "reservation:Reservation" as reservation
+
+database ":database" as database
+
+
+activate user
+    user --> main : POST /tables/1/reservations/1 (BODY: To-create-reservation-JSON)
+    activate main
+    main --> main : validate [valid Reservation-JSONs] using\npydantic and cast to ReservationNew
+        activate main
+        create reservation_to_create
+        main -->> reservation_to_create : new
+        deactivate main
+        main --> tables : create_reservation_for_table(1, reservation_to_create, 1)
+            activate tables
+            tables --> session : scalars(select(TableModel).where(TableModel.id == 1)).first()
+                activate session
+                session --> database : select * from tables where id = 1;
+                    activate database
+                    database --> session : query result (table)
+                    deactivate database
+                create table
+                session -->> table: new - (simplified, actually done by\nsqlalchemy in backgrond)
+                session --> tables : table
+                deactivate session
+            tables --> reservation_to_create : validate_for_table(table) - (simplified)
+                activate reservation_to_create
+                reservation_to_create --> tables : 1 (= table.id)
+                tables --> reservation_to_create : cast_to_model()
+                create reservation_model
+                reservation_to_create -->> reservation_model : new
+                reservation_to_create --> reservation_model : .id = 1
+                    activate reservation_model
+                    deactivate reservation_model
+                reservation_to_create --> tables : reservation_model
+                deactivate reservation_to_create
+            tables --> session : add(reservation_model)
+                activate session
+                tables --> session : commit()
+                deactivate session
+            create reservation
+            tables -->> reservation : Reservation.cast_from_model(reservation_model)
+            tables --> main : added_reservation
+            deactivate tables
+        main --> user : RESPONSE (BODY: added_reservation (JSON)
+    deactivate main
+deactivate user
+
+@enduml

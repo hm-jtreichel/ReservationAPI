@@ -1,0 +1,66 @@
+@startuml
+
+'Slightly simplified:
+'Doesn't show dependency between endpoints of one
+'and models of other modules (e.g. tables and reservationModels)
+'Also generalizes dependency to other module instead of concrete class
+
+package api {
+    component main
+    component util
+    package owners as ownerModule {
+        component ownerModels
+        component owners
+    }
+    package reservations as reservationModule {
+        component reservationModels
+        component reservations
+    }
+    package restaurants as restaurantModule {
+        component addressModels
+        component businessHourModels
+        component restaurantModels
+        component restaurants
+    }
+    package tables as tableModule {
+        component tableModels
+        component tables
+    }
+}
+
+package db {
+    component manager
+    component models
+}
+
+component sqlalchemy
+component fastapi
+component pydantic
+
+api --d-> db
+api --d-> sqlalchemy
+api --d-> fastapi
+api --d-> pydantic
+
+db --> sqlalchemy
+
+main --> tableModule
+main --> restaurantModule
+main --> reservationModule
+main --> ownerModule
+
+tableModule ---> util
+restaurantModule ---> util
+reservationModule ---> util
+ownerModule ---> util
+
+tables --> tableModels
+
+restaurants --> restaurantModels
+restaurantModels --> businessHourModels
+restaurantModels --> addressModels
+
+reservations --> reservationModels
+
+owners --> ownerModels
+@enduml
