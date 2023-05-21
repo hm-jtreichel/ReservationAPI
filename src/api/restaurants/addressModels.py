@@ -4,8 +4,10 @@ This module defines the `Address` class which represents the address of a restau
 
 from __future__ import annotations
 
-from pydantic import BaseModel as PydanticBase, Extra, Field
+from pydantic import BaseModel as PydanticBase, Extra, Field, root_validator
+
 from ...db.models import Address as AddressModel
+from ..util import is_valid_country_code
 
 
 class Address(PydanticBase):
@@ -16,7 +18,13 @@ class Address(PydanticBase):
     house_number: str
     postal_code: int = Field(gt=0)
     city: str
-    country_code: str
+    country_code: str = Field(regex="^[A-Z]{2}$")  # Regex: Exactly two upper-case letters.
+
+    @root_validator(skip_on_failure=True)
+    def validate_country_code(cls, values):
+        if not is_valid_country_code(values['country_code']):
+            raise ValueError(f"<{values['country_code']}> is an invalid country-code!")
+        return values
 
     class Config:
         schema_extra = {
