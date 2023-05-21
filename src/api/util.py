@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from pydantic import BaseModel as PydanticBase
 from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase
+from pycountry import countries
 
 from ..db.manager import SessionFacade
 
@@ -89,3 +90,16 @@ def format_description_with_example(description: str, example: Union[str, int]) 
         str: The formatted string.
     """
     return f"{description}<br><br><i>Example:</i> {example}"
+
+
+def is_valid_country_code(country_code: str) -> bool:
+    """
+    Checks if a country code is valid.
+
+    Args:
+        country_code (str): The two-letter country code to validate.
+
+    Returns:
+        bool: True if the country code is valid, False otherwise.
+    """
+    return bool(countries.get(alpha_2=country_code))

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel as PydanticBase, Field, Extra
+from pydantic import BaseModel as PydanticBase, Field, Extra, EmailStr
 from fastapi import Query
 from sqlalchemy import select
 
@@ -24,7 +24,7 @@ class OwnerNew(PydanticBase):
     """
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     phone: Optional[str]
 
     class Config:
@@ -82,7 +82,7 @@ class Owner(PydanticBase):
     id: int
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     phone: Optional[str]
 
     class Config:
@@ -129,7 +129,7 @@ class OwnerPut(PydanticBase):
     id: int = Field(gt=0)
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     phone: Optional[str]
 
     class Config:
