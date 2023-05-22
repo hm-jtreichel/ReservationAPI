@@ -38,10 +38,11 @@ class Restaurant(Base):
 
     owner: Mapped[Owner] = relationship(back_populates="restaurants")
     address: Mapped[Address] = relationship(back_populates="restaurant",
-                                            cascade="save-update, merge, delete, delete-orphan")
+                                            cascade="all, delete-orphan")
     business_hours: Mapped[List[BusinessHour]] = relationship(back_populates="restaurant",
-                                                              cascade="save-update, merge, delete, delete-orphan")
-    tables: Mapped[List[Table]] = relationship(back_populates="restaurant")
+                                                              cascade="all, delete-orphan")
+    tables: Mapped[List[Table]] = relationship(back_populates="restaurant",
+                                               cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Restaurant, id={self.id}, name={self.name}>"
@@ -69,7 +70,8 @@ class Owner(Base):
     email: Mapped[str]
     phone: Mapped[Optional[str]]
 
-    restaurants: Mapped[List[Restaurant]] = relationship(back_populates="owner")
+    restaurants: Mapped[List[Restaurant]] = relationship(back_populates="owner",
+                                                         cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Owner, id={self.id}, email={self.email}>"
@@ -166,7 +168,8 @@ class Table(Base):
     restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurant.id"))
 
     restaurant: Mapped[Restaurant] = relationship(back_populates="tables")
-    reservations: Mapped[List[Reservation]] = relationship(back_populates="table")
+    reservations: Mapped[List[Reservation]] = relationship(back_populates="table",
+                                                           cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Table, id={self.id}, name={self.name}, seats={self.seats}>"

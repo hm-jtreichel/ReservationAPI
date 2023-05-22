@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase
 from pycountry import countries
 
-from ..db.manager import SessionFacade
+from src.db.manager import SessionFacade
 
 T = TypeVar('T')
 

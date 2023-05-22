@@ -7,7 +7,7 @@ from __future__ import annotations
 from pydantic import BaseModel as PydanticBase, Extra, Field, root_validator
 
 from ...db.models import Address as AddressModel
-from ..util import is_valid_country_code
+from ...util import is_valid_country_code
 
 
 class Address(PydanticBase):
