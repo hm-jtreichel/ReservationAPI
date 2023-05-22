@@ -1,16 +1,19 @@
 from typing import Iterable
+import os
 
-from sqlalchemy import create_engine, Executable, ScalarResult
+from sqlalchemy import create_engine, Executable, ScalarResult, URL
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.session import make_transient
-from sqlalchemy.pool import StaticPool
 
-# TODO: Engine using SQLite (currently connection + creation /
-#  later split with PostgreSQL) - also probably remove connect_args and poolclass (+import)
-engine = create_engine("sqlite://",
-                       echo=False,
-                       connect_args={"check_same_thread": False},
-                       poolclass=StaticPool)
+url = URL.create(
+    drivername=f'{os.environ.get("DATABASE_DIALECT")}+{os.environ.get("DATABASE_DRIVER")}',
+    username=os.environ.get("DATABASE_USER"),
+    password=os.environ.get("DATABASE_PASSWORD"),
+    host=os.environ.get("DATABASE_HOST"),
+    port=os.environ.get("DATABASE_PORT"),
+    database=os.environ.get("DATABASE_NAME")
+)
+engine = create_engine(url, echo=False)
 
 from .models import Base
 Base.metadata.create_all(engine)

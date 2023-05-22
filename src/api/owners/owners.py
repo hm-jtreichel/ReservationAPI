@@ -7,7 +7,7 @@ from typing import List, Union
 from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
 from sqlalchemy import select
 
-from ..util import validate_ids_in_put_request
+from ...util import validate_ids_in_put_request
 from ...db.manager import SessionFacade
 from .ownerModels import Owner as PydanticOwner, \
     OwnerQuery as PydanticOwnerQuery, \

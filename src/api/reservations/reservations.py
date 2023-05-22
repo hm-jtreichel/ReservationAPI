@@ -4,7 +4,7 @@ from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 
-from ..util import validate_ids_in_put_request
+from ...util import validate_ids_in_put_request
 from ...db.manager import SessionFacade
 from .reservationModels import Reservation as PydanticReservation, \
     ReservationNew as PydanticReservationNew, \

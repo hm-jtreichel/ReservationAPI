@@ -11,7 +11,7 @@ from pydantic import BaseModel as PydanticBase, Field, Extra, root_validator
 from fastapi import Query
 from sqlalchemy import select, and_, func
 
-from ..util import format_description_with_example
+from ...util import format_description_with_example
 from ...db.manager import SessionFacade
 from ...db.models import Reservation as ReservationModel, \
     Restaurant as RestaurantModel, \

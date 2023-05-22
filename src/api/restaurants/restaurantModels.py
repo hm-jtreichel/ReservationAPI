@@ -10,7 +10,7 @@ from pydantic import BaseModel as PydanticBase, Field, Extra
 from fastapi import Query
 from sqlalchemy import select
 
-from ..util import format_description_with_example
+from ...util import format_description_with_example
 from ...db.manager import SessionFacade
 from ...db.models import Restaurant as RestaurantModel
 from .addressModels import Address

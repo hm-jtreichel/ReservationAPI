@@ -1,10 +1,16 @@
+import os
+
 from fastapi import FastAPI
 from starlette.responses import RedirectResponse
 
-from .owners import owners
-from .restaurants import restaurants
-from .tables import tables
-from .reservations import reservations
+if not os.environ.get("DATABASE_HOST"):
+    import conf.config
+
+from .api.owners import owners
+from .api.restaurants import restaurants
+from .api.tables import tables
+from .api.reservations import reservations
+
 
 description = """
 This project was being developed during the class "Enterprise-Information-Management" in Summer 2023.
