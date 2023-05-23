@@ -16,4 +16,6 @@ ARG PORT=80
 
 EXPOSE $PORT
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+ENV ENV_PORT=$PORT
+
+CMD uvicorn src.main:app --host 0.0.0.0 --port $ENV_PORT
