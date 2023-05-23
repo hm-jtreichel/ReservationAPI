@@ -1,0 +1,29 @@
+@startuml
+'https://plantuml.com/deployment-diagram
+
+node ":Benutzer PC" <<device>> {
+    node ":API Client" <<execution environment>> {
+        artifact "curl" <<artifact>> as curl
+        artifact "Requests (python)" <<artifact>> as requests
+    }
+}
+
+node ":Azure Cloud" <<cloud>> {
+    node ":Azure Server (DB)" <<device>> {
+        artifact ":Azure PostgreSQL" <<artifact>> as postgres
+    }
+    node ":Azure Server (VM)" <<device>> {
+        artifact ":ReservationsAPI" <<artifact>> as reservationsapi
+    }
+}
+
+curl -u-> reservationsapi
+reservationsapi .d.> curl
+
+requests -u-> reservationsapi
+reservationsapi .d.> requests
+
+reservationsapi -r-> postgres
+postgres .l.> reservationsapi
+
+@enduml

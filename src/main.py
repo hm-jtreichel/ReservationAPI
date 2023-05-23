@@ -45,7 +45,7 @@ tags_metadata = [
 app = FastAPI(
     title="ReservationAPI",
     description=description,
-    version="0.2",
+    version="1.0",
     openapi_tags=tags_metadata,
     swagger_ui_parameters={
         "defaultModelsExpandDepth": -1,  # Hide schemas from /docs
