@@ -1,0 +1,39 @@
+variables:
+  REPOSITORY_NAME: jtreiche/eim-2023-reservationapi
+  IMAGE_TAG: reservation-api-$CI_COMMIT_SHORT_SHA
+
+
+stages:
+  - test
+  - build
+  - deploy
+
+
+api-tests:
+  stage: test
+  image: python:3.8
+  before_script:
+    - pip install --no-cache-dir --upgrade --no-dependencies -r ./requirements.txt
+    - curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+    - postman login --with-api-key $POSTMAN_API_KEY
+  script:
+    - export USE_IN_MEMORY_DB=True
+    - uvicorn src.main:app --host 0.0.0.0 --port 8000 &
+    - sleep 10
+    - postman collection run "25695533-4cbee508-f0d7-4837-9fae-626dfe89a66e"
+
+
+build_image:
+  stage: build
+  image: docker@sha256:c8bb6fa5388b56304dd770c4bc0478de81ce18540173b1a589178c0d31bfce90
+  services:
+    - docker:dind@sha256:c8bb6fa5388b56304dd770c4bc0478de81ce18540173b1a589178c0d31bfce90
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+  script:
+    - docker build -t $REPOSITORY_NAME:$IMAGE_TAG .
+    - docker push $REPOSITORY_NAME:$IMAGE_TAG
+  only:
+    - main
