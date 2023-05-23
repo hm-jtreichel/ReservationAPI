@@ -37,3 +37,25 @@ build_image:
     - docker push $REPOSITORY_NAME:$IMAGE_TAG
   only:
     - main
+
+
+deploy:
+  stage: deploy
+  before_script:
+    - chmod 400 $WEBSERVER_SSH_KEY
+  script:
+    - ssh -o StrictHostKeyChecking=no -i $WEBSERVER_SSH_KEY $WEBSERVER_USER@$WEBSERVER_IP "
+        sudo docker login -u $DOCKER_USER -p '$DOCKER_PASSWORD' &&
+        sudo docker ps -aq | xargs -r sudo docker stop | xargs -r sudo docker rm &&
+        sudo docker run -d
+          -e DATABASE_DIALECT='$DATABASE_DIALECT'
+          -e DATABASE_DRIVER='$DATABASE_DRIVER'
+          -e DATABASE_USER='$DATABASE_USER'
+          -e DATABASE_PASSWORD='$DATABASE_PASSWORD'
+          -e DATABASE_HOST='$DATABASE_HOST'
+          -e DATABASE_PORT='$DATABASE_PORT'
+          -e DATABASE_NAME='$DATABASE_NAME'
+          -e USE_IN_MEMORY_DB='$USE_IN_MEMORY_DB'
+          -p 80:80 $REPOSITORY_NAME:$IMAGE_TAG"
+  only:
+    - main
