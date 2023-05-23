@@ -5,17 +5,25 @@ from sqlalchemy import create_engine, Executable, ScalarResult, URL
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.session import make_transient
 
-url = URL.create(
-    drivername=f'{os.environ.get("DATABASE_DIALECT")}+{os.environ.get("DATABASE_DRIVER")}',
-    username=os.environ.get("DATABASE_USER"),
-    password=os.environ.get("DATABASE_PASSWORD"),
-    host=os.environ.get("DATABASE_HOST"),
-    port=os.environ.get("DATABASE_PORT"),
-    database=os.environ.get("DATABASE_NAME")
-)
-engine = create_engine(url, echo=False)
-
 from .models import Base
+
+if os.environ.get("USE_IN_MEMORY_DB") == "True":
+    from sqlalchemy.pool import StaticPool
+    engine = create_engine("sqlite://",
+                           echo=False,
+                           connect_args={"check_same_thread": False},
+                           poolclass=StaticPool)
+else:
+    url = URL.create(
+        drivername=f'{os.environ.get("DATABASE_DIALECT")}+{os.environ.get("DATABASE_DRIVER")}',
+        username=os.environ.get("DATABASE_USER"),
+        password=os.environ.get("DATABASE_PASSWORD"),
+        host=os.environ.get("DATABASE_HOST"),
+        port=os.environ.get("DATABASE_PORT"),
+        database=os.environ.get("DATABASE_NAME")
+    )
+    engine = create_engine(url, echo=False)
+
 Base.metadata.create_all(engine)
 
 

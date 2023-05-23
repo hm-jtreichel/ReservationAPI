@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from starlette.responses import RedirectResponse
 
-if not os.environ.get("DATABASE_HOST"):
+if not os.environ.get("USE_IN_MEMORY_DB"):
     import conf.config
 
 from .api.owners import owners
