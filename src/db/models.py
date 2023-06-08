@@ -67,7 +67,7 @@ class Owner(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     first_name: Mapped[str]
     last_name: Mapped[str]
-    email: Mapped[str]
+    email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[str]
     phone: Mapped[Optional[str]]
 

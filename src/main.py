@@ -13,9 +13,10 @@ from .api.owners import owners
 from .api.restaurants import restaurants
 from .api.tables import tables
 from .api.reservations import reservations
+from .api.authentication import authentication
 
 from .api.authentication.AuthenticationModels import Token as PydanticToken
-from .api.authentication.autentication import authenticate_owner, create_access_token
+from .api.authentication.autenticationUtils import authenticate_owner, create_access_token
 
 
 description = """
@@ -69,27 +70,9 @@ app.include_router(owners.router)
 app.include_router(restaurants.router)
 app.include_router(tables.router)
 app.include_router(reservations.router)
+app.include_router(authentication.router)
 
 
 @app.get('/', include_in_schema=False)
 def redirect_to_docs():
     return RedirectResponse(url="/docs")
-
-
-@app.post('/token', tags=['authentication'])
-def login_for_access_token(
-        form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-) -> PydanticToken:
-    owner = authenticate_owner(form_data.username, form_data.password)
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token = create_access_token(
-        data={"sub": owner.email}
-    )
-    return PydanticToken(access_token=access_token,
-                         token_type="bearer")
