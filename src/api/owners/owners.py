@@ -2,17 +2,15 @@
 Module containing routes for Owner-related API endpoints.
 """
 
-from typing import List, Union, Annotated
+from typing import List, Annotated
 
 from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
 from sqlalchemy import select
 
-from ...util import validate_ids_in_put_request
 from ...db.manager import SessionFacade
 from .ownerModels import Owner as PydanticOwner, \
     OwnerQuery as PydanticOwnerQuery, \
     OwnerNew as PydanticOwnerNew, \
-    OwnerPut as PydanticOwnerPut, \
     OwnerModel
 from ..restaurants.restaurantModels import Restaurant as PydanticRestaurant, \
     RestaurantNew as PydanticRestaurantNew, \
@@ -35,6 +33,7 @@ session = SessionFacade()
             summary="Get a list of owners (optionally matching provided query parameters)",
             response_description="The list of owners matching the provided query parameters",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
 def get_owners(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -44,13 +43,15 @@ def get_owners(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
     \f
     Parameters:
     -----------
+    current_owner : Annotated[OwnerModel, Depends(get_current_owner)]
+        The Owner matching the given authentication token.
     owner_query : PydanticOwnerQuery, optional
         The query parameters used to filter the returned list of Owners.
 
     Raises:
     -------
     HTTPException
-        Raised if there are no owners that match the specified query parameters.
+        Raised if there are no owners that match the specified query parameters or the user is not authenticated.
 
     Returns:
     --------
@@ -82,7 +83,8 @@ def get_owners(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
             summary="Update owner information for logged in owner",
             response_description="The updated owner",
             responses={
-                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
+                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
             })
 def update_owner(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
                  owner_to_update: PydanticOwnerNew = Body(description="The owner object you want to update")
@@ -91,14 +93,16 @@ def update_owner(current_owner: Annotated[OwnerModel, Depends(get_current_owner)
     Update an owner with a specified ID in the database.
     \f
     Args:
-       owner_to_update (PydanticOwnerNew): The owner object to update.
+        current_owner : Annotated[OwnerModel, Depends(get_current_owner)]
+            The Owner matching the given authentication token.
+        owner_to_update (PydanticOwnerNew): The owner object to update.
 
     Returns:
        PydanticOwner: The updated owner object.
 
     Raises:
        HTTPException: If the owner ID is invalid or if the owner object in the request-body does not match the ID
-       in the path-parameter.
+       in the path-parameter or the user is not authenticated.
     """
     owner_to_update = owner_to_update.cast_to_put(current_owner.id)
 
@@ -116,16 +120,20 @@ def update_owner(current_owner: Annotated[OwnerModel, Depends(get_current_owner)
                summary="Delete owner (own account)",
                response_description="The deleted owner",
                responses={
-                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"}
+                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request"},
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
                })
 def delete_owner(current_owner: Annotated[OwnerModel, Depends(get_current_owner)]) -> PydanticOwner:
     """
     Delete an owner with a specified ID.
     \f
     Args:
-
+        current_owner : Annotated[OwnerModel, Depends(get_current_owner)]
+            The Owner matching the given authentication token.
     Returns:
         PydanticOwner: The deleted owner object.
+    Raises:
+       HTTPException: If the user is not authenticated.
     """
     qry = select(OwnerModel).where(OwnerModel.id == current_owner.id)
     owner: OwnerModel = session.scalars(qry).first()
@@ -142,7 +150,8 @@ def delete_owner(current_owner: Annotated[OwnerModel, Depends(get_current_owner)
              summary="Create one or multiple restaurants",
              response_description="The created restaurants",
              responses={
-                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"}
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
              },
              tags=['restaurants'])
 def create_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -153,13 +162,15 @@ def create_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_
     Creates one or multiple restaurants with the provided data.
     \f
     Args:
+        current_owner : Annotated[OwnerModel, Depends(get_current_owner)]
+            The Owner matching the given authentication token.
         new_restaurants: The list of restaurants you want to create.
 
     Returns:
         The list of the created restaurants.
 
     Raises:
-        HTTPException: If the request-body is invalid.
+        HTTPException: If the request-body is invalid or the user is not authenticated.
 
     """
     if not new_restaurants:
@@ -182,7 +193,8 @@ def create_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_
              summary="Create a new restaurant with a specified ID.",
              response_description="The created restaurant",
              responses={
-                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
              },
              tags=['restaurants'])
 def create_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -193,6 +205,8 @@ def create_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_o
     Creates a single restaurant with the provided data and a specified ID.
     \f
     Args:
+        current_owner : Annotated[OwnerModel, Depends(get_current_owner)]
+            The Owner matching the given authentication token.
         restaurant_id: The ID of the restaurant you want to create. Must be greater than 0.
         new_restaurant: The restaurant you want to create.
 
@@ -200,7 +214,8 @@ def create_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_o
         The created restaurant.
 
     Raises:
-        HTTPException: If the owner with the given ID does not exist or the given ID for restaurant is not available.
+        HTTPException: If the owner with the given ID does not exist or the given ID for restaurant is not available
+        or the user is not authenticated.
 
     """
     qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
