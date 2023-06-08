@@ -15,7 +15,7 @@ from .api.tables import tables
 from .api.reservations import reservations
 from .api.authentication import authentication
 
-from .api.authentication.AuthenticationModels import Token as PydanticToken
+from .api.authentication.authenticationModels import Token as PydanticToken
 from .api.authentication.authenticationUtils import authenticate_owner, create_access_token
 
 

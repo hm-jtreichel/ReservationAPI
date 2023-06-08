@@ -15,7 +15,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from ..owners.ownerModels import OwnerModel
-from .AuthenticationModels import TokenData
+from .authenticationModels import TokenData
 
 SECRET_KEY = "26f3bad8b23608b165b1f57694bd3a775bf41107d8d2f8be5637c6da3bc68dc1"
 ALGORITHM = "HS256"
