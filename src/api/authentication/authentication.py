@@ -1,6 +1,10 @@
-from typing import Annotated, Optional
+"""
+Module containing routes for Authentication-related API endpoints.
+"""
 
-from fastapi import APIRouter, status, HTTPException, Depends, Query, Body
+from typing import Annotated
+
+from fastapi import APIRouter, status, HTTPException, Depends, Body
 from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy import select
@@ -24,11 +28,28 @@ router = APIRouter(
 session = SessionFacade()
 
 
-# TODO: Docstring!
 @router.post('/token')
 def login_for_access_token(
         form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ) -> PydanticToken:
+    """
+    Authenticates the owner and generates an access token for authorization.
+    \f
+    Parameters:
+    -----------
+    form_data : Annotated[OAuth2PasswordRequestForm, Depends()]
+        The form data containing the username and password for authentication.
+
+    Raises:
+    -------
+    HTTPException
+        Raised if the authentication fails, indicating incorrect username or password.
+
+    Returns:
+    --------
+    PydanticToken
+        A PydanticToken object containing the generated access token and token type.
+    """
     owner = authenticate_owner(form_data.username, form_data.password)
     if not owner:
         raise HTTPException(
