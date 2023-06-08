@@ -74,6 +74,7 @@ class OwnerNew(PydanticBase):
             first_name=self.first_name,
             last_name=self.last_name,
             email=self.email,
+            password=hash_password(self.password),
             phone=self.phone
         )
         return owner_put
@@ -134,6 +135,7 @@ class OwnerPut(PydanticBase):
     first_name: str
     last_name: str
     email: EmailStr
+    password: str
     phone: Optional[str]
 
     class Config:
@@ -143,6 +145,7 @@ class OwnerPut(PydanticBase):
                 "first_name": "Max",
                 "last_name": "Muster",
                 "email": "mustermax@mail.com",
+                "password": "password",
                 "phone": "+49-123-123-45678"
             }
         }
@@ -163,6 +166,7 @@ class OwnerPut(PydanticBase):
         owner_model.first_name = self.first_name
         owner_model.last_name = self.last_name
         owner_model.email = self.email
+        owner_model.hashed_password = self.password
         owner_model.phone = self.phone
 
         return owner_model
