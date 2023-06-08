@@ -14,6 +14,7 @@ from sqlalchemy import select
 from ...util import format_description_with_example
 from ...db.manager import SessionFacade
 from ...db.models import Owner as OwnerModel
+from ..authentication.autentication import hash_password
 
 session = SessionFacade()
 
@@ -25,6 +26,7 @@ class OwnerNew(PydanticBase):
     first_name: str
     last_name: str
     email: EmailStr
+    password: str
     phone: Optional[str]
 
     class Config:
@@ -33,6 +35,7 @@ class OwnerNew(PydanticBase):
                 "first_name": "Max",
                 "last_name": "Muster",
                 "email": "mustermax@mail.com",
+                "password": "password",
                 "phone": "+49-123-123-45678"
             }
         }
@@ -51,6 +54,7 @@ class OwnerNew(PydanticBase):
             first_name=self.first_name,
             last_name=self.last_name,
             email=self.email,
+            hashed_password=hash_password(self.password),
             phone=self.phone
         )
         return owner_model

@@ -68,6 +68,7 @@ class Owner(Base):
     first_name: Mapped[str]
     last_name: Mapped[str]
     email: Mapped[str]
+    hashed_password: Mapped[str]
     phone: Mapped[Optional[str]]
 
     restaurants: Mapped[List[Restaurant]] = relationship(back_populates="owner",
