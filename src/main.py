@@ -1,6 +1,9 @@
 import os
 
-from fastapi import FastAPI
+from typing import Annotated
+
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from starlette.responses import RedirectResponse
 
 if not os.environ.get("USE_IN_MEMORY_DB"):
@@ -10,6 +13,9 @@ from .api.owners import owners
 from .api.restaurants import restaurants
 from .api.tables import tables
 from .api.reservations import reservations
+
+from .api.authentication.AuthenticationModels import Token as PydanticToken
+from .api.authentication.autentication import authenticate_owner, create_access_token
 
 
 description = """
@@ -24,6 +30,10 @@ The ReservationAPI provides basic services to manage reservations for restaurant
 """
 
 tags_metadata = [
+    {
+        "name": "authentication",
+        "description": "Operations to authenticate"
+    },
     {
         "name": "owners",
         "description": "Operations with owners"
@@ -64,3 +74,22 @@ app.include_router(reservations.router)
 @app.get('/', include_in_schema=False)
 def redirect_to_docs():
     return RedirectResponse(url="/docs")
+
+
+@app.post('/token', tags=['authentication'])
+def login_for_access_token(
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+) -> PydanticToken:
+    owner = authenticate_owner(form_data.username, form_data.password)
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token = create_access_token(
+        data={"sub": owner.email}
+    )
+    return PydanticToken(access_token=access_token,
+                         token_type="bearer")
