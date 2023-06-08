@@ -17,7 +17,7 @@ from .ownerModels import Owner as PydanticOwner, \
 from ..restaurants.restaurantModels import Restaurant as PydanticRestaurant, \
     RestaurantNew as PydanticRestaurantNew, \
     RestaurantModel
-from ..authentication.autenticationUtils import get_current_owner
+from ..authentication.authenticationUtils import get_current_owner
 
 router = APIRouter(
     prefix="/owners",

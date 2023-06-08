@@ -16,7 +16,7 @@ from .api.reservations import reservations
 from .api.authentication import authentication
 
 from .api.authentication.AuthenticationModels import Token as PydanticToken
-from .api.authentication.autenticationUtils import authenticate_owner, create_access_token
+from .api.authentication.authenticationUtils import authenticate_owner, create_access_token
 
 
 description = """

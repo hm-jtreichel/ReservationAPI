@@ -14,7 +14,7 @@ from sqlalchemy import select
 from ...util import format_description_with_example
 from ...db.manager import SessionFacade
 from ...db.models import Owner as OwnerModel
-from ..authentication.autenticationUtils import hash_password
+from ..authentication.authenticationUtils import hash_password
 
 session = SessionFacade()
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from ...db.manager import SessionFacade
 from .AuthenticationModels import Token as PydanticToken
-from .autenticationUtils import authenticate_owner, create_access_token
+from .authenticationUtils import authenticate_owner, create_access_token
 from ..owners.ownerModels import OwnerNew as PydanticOwnerNew, \
     Owner as PydanticOwner,\
     OwnerModel
