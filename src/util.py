@@ -81,10 +81,10 @@ def validate_ids_in_put_request(elements_to_update: List[PydanticBase],
     order = DATA_MODEL_ORDER[data_model]
 
     if order > 1:
-        qry = qry.join(Table.reservations)
+        qry = qry.join(Table)
 
     if order > 0:
-        qry = qry.join(Restaurant.tables)
+        qry = qry.join(Restaurant)
 
     qry = qry.where(Restaurant.owner_id == current_owner.id)
 
