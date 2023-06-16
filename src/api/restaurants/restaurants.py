@@ -34,11 +34,11 @@ router = APIRouter(
 session = SessionFacade()
 
 
-# TODO: Doctrings!
 @router.get('/',
             summary="Get a list of restaurants (optionally matching provided query parameters)",
             response_description="The list of restaurants matching the provided query parameters",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
 def get_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -47,6 +47,8 @@ def get_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_own
     Get a list of restaurants matching the provided query parameters.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_query (PydanticRestaurantQuery, optional):
         The query parameters used to filter the list of restaurants.
 
@@ -87,6 +89,7 @@ def get_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_own
             summary="Get a single restaurant by its ID",
             response_description="The restaurant with the provided ID",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
 def get_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -96,6 +99,8 @@ def get_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owne
     Retrieve a single restaurant by its ID.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int): The ID of the restaurant to retrieve. Must be greater than 0.
 
     Returns:
@@ -116,12 +121,12 @@ def get_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owne
     return PydanticRestaurant.cast_from_model(restaurant)
 
 
-# TODO: PUT with authentication!!!
 @router.put('/',
             summary="Update one or multiple restaurants",
             response_description="The updated restaurants",
             responses={
-                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"}
+                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
             })
 def update_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
                        restaurants_to_update: List[PydanticRestaurantPut] = Body(description="The restaurant objects "
@@ -131,6 +136,8 @@ def update_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_
     Updates one or multiple restaurants.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurants_to_update (List[PydanticRestaurantPut]): A list of restaurant objects to be updated.
 
     Returns:
@@ -144,7 +151,7 @@ def update_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (restaurant-)objects present in the list request-body")
 
-    validate_ids_in_put_request(restaurants_to_update, RestaurantModel)
+    validate_ids_in_put_request(restaurants_to_update, RestaurantModel, current_owner)
 
     restaurant_models = [restaurant_to_update.cast_to_model() for restaurant_to_update in restaurants_to_update]
     session.merge_all(restaurant_models)
@@ -156,14 +163,15 @@ def update_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_
     return updated_restaurants
 
 
-# TODO: PUT with authentication!!!
 @router.put('/{restaurant_id}',
             summary="Update a single restaurant by ID",
             response_description="The updated restaurant",
             responses={
-                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
+                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
             })
-def update_restaurant(restaurant_id: int = Path(description="The ID of the restaurant to update", gt=0),
+def update_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                      restaurant_id: int = Path(description="The ID of the restaurant to update", gt=0),
                       restaurant_to_update: Union[PydanticRestaurantPut, PydanticRestaurantNew] =
                       Body(description="The restaurant object you want to update.")
                       ) -> PydanticRestaurant:
@@ -171,6 +179,8 @@ def update_restaurant(restaurant_id: int = Path(description="The ID of the resta
     Update a single restaurant by ID.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int, Path): The ID of the restaurant to update.
         restaurant_to_update (Union[PydanticRestaurantPut, PydanticRestaurantNew], Body): The restaurant object you
         want to update.
@@ -187,7 +197,9 @@ def update_restaurant(restaurant_id: int = Path(description="The ID of the resta
                                 detail=f"The path-parameter ID <{restaurant_id}> doesn't match the "
                                        f"ID <{restaurant_to_update.id}> of the restaurant object in the request-body")
 
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -209,11 +221,18 @@ def update_restaurant(restaurant_id: int = Path(description="The ID of the resta
 
 @router.delete('/',
                summary="Delete all restaurants in the database",
-               response_description="The deleted restaurants")
+               response_description="The deleted restaurants",
+               responses={
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
+               }
+               )
 def delete_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)]) -> List[PydanticRestaurant]:
     """
     Delete all restaurants.
     \f
+    Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
     Returns:
         List[PydanticRestaurant]: The deleted restaurants.
     """
@@ -232,7 +251,8 @@ def delete_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_
                summary="Delete a single restaurant with a given ID in the database",
                response_description="The deleted restaurant",
                responses={
-                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"}
+                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"},
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
                })
 def delete_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
                       restaurant_id: int = Path(description="The ID of the restaurant to be deleted.", gt=0)
@@ -241,6 +261,8 @@ def delete_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_o
     Delete a single restaurant by ID.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int, Path): The ID of the restaurant to be deleted.
 
     Returns:
@@ -270,7 +292,8 @@ def delete_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_o
              summary="Create one or multiple tables",
              response_description="The created tables",
              responses={
-                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"}
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
              },
              tags=['tables'])
 def create_tables_for_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -281,6 +304,8 @@ def create_tables_for_restaurant(current_owner: Annotated[OwnerModel, Depends(ge
     Create one or multiple tables for a restaurant.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int, Path): The ID of the restaurant of the table.
         tables_to_create (List[PydanticTableNew], Body): The tables you want to create.
 
@@ -317,7 +342,8 @@ def create_tables_for_restaurant(current_owner: Annotated[OwnerModel, Depends(ge
              summary="Create a new table with a specified ID for a restaurant.",
              response_description="The created table",
              responses={
-                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
+                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
              },
              tags=['tables'])
 def create_table_for_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
@@ -329,6 +355,8 @@ def create_table_for_restaurant(current_owner: Annotated[OwnerModel, Depends(get
     Create a new table with a specified ID for a restaurant.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int, Path): The ID of the restaurant of the table.
         table_to_create (PydanticTableNew, Body): The table you want to create.
         table_id (int, Path): The ID of the table you want to create.
@@ -372,6 +400,7 @@ def create_table_for_restaurant(current_owner: Annotated[OwnerModel, Depends(get
              responses={
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list or reservations "
                                                               "not possible)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                  status.HTTP_409_CONFLICT: {"description": "At least one reservation is not possible for the given "
                                                            "restaurant"}
              },
@@ -386,6 +415,8 @@ def create_reservations_for_restaurant(
     Create one or multiple reservations for a restaurant and assign them to a valid table
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int): The ID of the restaurant of the reservation.
         reservations_to_create (List[PydanticReservationNew]): The reservations you want to create
                                                                (sorted by priority descending).
@@ -446,6 +477,7 @@ def create_reservations_for_restaurant(
              response_description="The created reservation",
              responses={
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                  status.HTTP_409_CONFLICT: {"description": "Reservation is not possible for the given restaurant"}
              },
              tags=['reservations'])
@@ -460,6 +492,8 @@ def create_reservation_for_restaurant(
     Create a new reservation with a specified ID for a restaurant.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int): The ID of the restaurant of the reservation.
         reservation_to_create (PydanticReservationNew): The reservation you want to create.
         reservation_id (int): The ID of the reservation you want to create.
@@ -510,6 +544,7 @@ def create_reservation_for_restaurant(
              response_description="An available table of the restaurant for the reservation.",
              responses={
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                  status.HTTP_409_CONFLICT: {"description": "Reservation is not possible for the given restaurant"}
              },
              tags=['reservations'])
@@ -522,6 +557,8 @@ def validate_reservation_for_restaurant(
     Validates a reservation for a restaurant.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+        The Owner matching the given authentication token.
         restaurant_id (int): The ID of the restaurant for the reservation.
         reservation_to_validate (PydanticReservationNew): The reservation you want to validate.
 
