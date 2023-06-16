@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Annotated
 
 from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
 from fastapi.encoders import jsonable_encoder
@@ -15,6 +15,9 @@ from ..reservations.reservationModels import Reservation as PydanticReservation,
     ReservationNew as PydanticReservationNew, \
     ReservationModel, \
     VALIDATION_ERRORS_TABLE
+from ..owners.ownerModels import OwnerModel
+from ..restaurants.restaurantModels import RestaurantModel
+from ..authentication.authenticationUtils import get_current_owner
 
 router = APIRouter(
     prefix="/tables",
@@ -32,13 +35,16 @@ session = SessionFacade()
             summary="Get a list of tables (optionally matching provided query parameters)",
             response_description="The list of tables matching the provided query parameters",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
-def get_tables(table_query: PydanticTableQuery = Depends()) -> List[PydanticTable]:
+def get_tables(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+               table_query: PydanticTableQuery = Depends()) -> List[PydanticTable]:
     """
     Get a list of tables matching the provided query parameters.
     \f
     Args:
+        current_owner : The Owner matching the given authentication token.
         table_query: A PydanticTableQuery instance containing query parameters for filtering the tables.
 
     Returns:
@@ -48,7 +54,7 @@ def get_tables(table_query: PydanticTableQuery = Depends()) -> List[PydanticTabl
         HTTPException: If no tables matching the provided query parameters are found.
 
     """
-    qry = select(TableModel)
+    qry = select(TableModel).join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
 
     if table_query.name:
         qry = qry.where(TableModel.name == table_query.name)
@@ -75,13 +81,16 @@ def get_tables(table_query: PydanticTableQuery = Depends()) -> List[PydanticTabl
             summary="Get a single table with a specified ID",
             response_description="The table with the specified ID",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
-def get_table(table_id: int = Path(description="The ID of the table you are looking for", gt=0)) -> PydanticTable:
+def get_table(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+              table_id: int = Path(description="The ID of the table you are looking for", gt=0)) -> PydanticTable:
     """
     Get a table with a specified ID.
     \f
     Args:
+        current_owner : The Owner matching the given authentication token.
         table_id: An integer representing the ID of the table to retrieve.
 
     Returns:
@@ -91,7 +100,8 @@ def get_table(table_id: int = Path(description="The ID of the table you are look
         HTTPException: If a table with the specified ID does not exist.
 
     """
-    qry = select(TableModel).where(TableModel.id == table_id)
+    qry = select(TableModel).where(TableModel.id == table_id)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     table_model: TableModel = session.scalars(qry).first()
 
     if not table_model:
@@ -107,15 +117,19 @@ def get_table(table_id: int = Path(description="The ID of the table you are look
             summary="Update one or multiple tables",
             response_description="The updated tables",
             responses={
-                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"}
+                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
             })
-def update_tables(tables_to_update: List[PydanticTablePut] = Body(description="The table objects "
+def update_tables(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                  tables_to_update: List[PydanticTablePut] = Body(description="The table objects "
                                                                               "you want to update")
                   ) -> List[PydanticTable]:
     """
     Updates one or multiple tables.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         tables_to_update (List[PydanticTablePut]): A list of table objects to be updated.
 
     Returns:
@@ -129,7 +143,7 @@ def update_tables(tables_to_update: List[PydanticTablePut] = Body(description="T
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (table-)objects present in the list request-body")
 
-    validate_ids_in_put_request(tables_to_update, TableModel)
+    validate_ids_in_put_request(tables_to_update, TableModel, current_owner)
 
     table_models = [table_to_update.cast_to_model() for table_to_update in tables_to_update]
     session.merge_all(table_models)
@@ -144,9 +158,11 @@ def update_tables(tables_to_update: List[PydanticTablePut] = Body(description="T
             summary="Update a single table by ID",
             response_description="The updated table",
             responses={
-                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
+                status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
             })
-def update_table(table_id: int = Path(description="The ID of the table to update", gt=0),
+def update_table(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                 table_id: int = Path(description="The ID of the table to update", gt=0),
                  table_to_update: Union[PydanticTablePut, PydanticTableNew] = Body(description="The table "
                                                                                                "object you want to "
                                                                                                "update.")
@@ -155,8 +171,10 @@ def update_table(table_id: int = Path(description="The ID of the table to update
     Updates a single table by ID.
     \f
     Args:
-    table_id (int): The ID of the table to update. Must be greater than 0.
-    table_to_update (Union[PydanticTablePut, PydanticTableNew]): The table object to update.
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
+        table_id (int): The ID of the table to update. Must be greater than 0.
+        table_to_update (Union[PydanticTablePut, PydanticTableNew]): The table object to update.
 
     Returns:
     PydanticTable: The updated table.
@@ -170,7 +188,8 @@ def update_table(table_id: int = Path(description="The ID of the table to update
                                 detail=f"The path-parameter ID <{table_id}> doesn't match the "
                                        f"ID <{table_to_update.id}> of the table object in the request-body")
 
-    qry = select(TableModel).where(TableModel.id == table_id)
+    qry = select(TableModel).where(TableModel.id == table_id)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     table_model: TableModel = session.scalars(qry).first()
 
     if not table_model:
@@ -192,15 +211,21 @@ def update_table(table_id: int = Path(description="The ID of the table to update
 
 @router.delete('/',
                summary="Delete all tables in the database",
-               response_description="The deleted tables")
-def delete_tables() -> List[PydanticTable]:
+               response_description="The deleted tables",
+               responses={
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
+               })
+def delete_tables(current_owner: Annotated[OwnerModel, Depends(get_current_owner)]) -> List[PydanticTable]:
     """
     Delete all tables.
     \f
+    Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
     Returns:
         List[PydanticTable]: The deleted tables.
     """
-    qry = select(TableModel)
+    qry = select(TableModel).join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     tables = session.scalars(qry).all()
 
     session.delete_all(tables)
@@ -215,14 +240,18 @@ def delete_tables() -> List[PydanticTable]:
                summary="Delete a single table with a given ID in the database",
                response_description="The deleted table",
                responses={
-                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"}
+                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"},
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
                })
-def delete_table(table_id: int = Path(description="The ID of the table to be deleted.", gt=0)
+def delete_table(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                 table_id: int = Path(description="The ID of the table to be deleted.", gt=0)
                  ) -> PydanticTable:
     """
     Delete a single table by ID.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         table_id (int, Path): The ID of the table to be deleted.
 
     Returns:
@@ -231,7 +260,8 @@ def delete_table(table_id: int = Path(description="The ID of the table to be del
     Raises:
         HTTPException: If the table with the given ID does not exist.
     """
-    qry = select(TableModel).where(TableModel.id == table_id)
+    qry = select(TableModel).where(TableModel.id == table_id)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     table: TableModel = session.scalars(qry).first()
 
     if not table:
@@ -252,11 +282,13 @@ def delete_table(table_id: int = Path(description="The ID of the table to be del
              responses={
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list or reservations "
                                                               "not possible)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                  status.HTTP_409_CONFLICT: {"description": "At least one reservation is not possible for the given "
                                                            "table"}
              },
              tags=['reservations'])
 def create_reservations_for_table(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         table_id: int = Path(description="The ID of the table of the reservation", gt=0),
         reservations_to_create: List[PydanticReservationNew] = Body(description="The reservations you want to create "
                                                                                 "(sorted by priority descending)")
@@ -265,6 +297,8 @@ def create_reservations_for_table(
     Create one or multiple reservations for a given table.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         table_id (int): The ID of the table of the reservation.
         reservations_to_create (List[PydanticReservationNew]): The reservations you want to create
                                                                (sorted by priority descending).
@@ -280,7 +314,8 @@ def create_reservations_for_table(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (reservation-)objects present in the list request-body")
 
-    qry = select(TableModel).where(TableModel.id == table_id)
+    qry = select(TableModel).where(TableModel.id == table_id)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     table: TableModel = session.scalars(qry).first()
 
     if not table:
@@ -323,10 +358,12 @@ def create_reservations_for_table(
              response_description="The created reservation",
              responses={
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                  status.HTTP_409_CONFLICT: {"description": "Reservation is not possible for the given table"}
              },
              tags=['reservations'])
 def create_reservation_for_table(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         table_id: int = Path(description="The ID of the table of the reservation", gt=0),
         reservation_to_create: PydanticReservationNew = Body(description="The reservation you want to "
                                                                          "create"),
@@ -336,6 +373,8 @@ def create_reservation_for_table(
     Create a new reservation with a specified ID for a given table.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         table_id (int): The ID of the restaurant of the reservation.
         reservation_to_create (PydanticReservationNew): The reservation you want to create.
         reservation_id (int): The ID of the reservation you want to create.
@@ -347,7 +386,8 @@ def create_reservation_for_table(
         HTTPException: If the request is invalid (e.g., ID not available), the restaurant with the given ID does not
                        exist, or an available table cannot be found for the provided reservation.
     """
-    qry = select(TableModel).where(TableModel.id == table_id)
+    qry = select(TableModel).where(TableModel.id == table_id)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     table: TableModel = session.scalars(qry).first()
 
     if not table:
@@ -384,10 +424,12 @@ def create_reservation_for_table(
              response_description="The table for the reservation (if available).",
              responses={
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                  status.HTTP_409_CONFLICT: {"description": "Reservation is not possible for the given table"}
              },
              tags=['reservations'])
 def validate_reservation_for_table(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         table_id: int = Path(description="The ID of the table of the reservation", gt=0),
         reservation_to_validate: PydanticReservationNew = Body(description="The reservation you want to validate"),
         ) -> PydanticTable:
@@ -395,6 +437,8 @@ def validate_reservation_for_table(
     Validates a reservation for a table.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         table_id (int): The ID of the table for the reservation.
         reservation_to_validate (PydanticReservationNew): The reservation you want to validate.
 
@@ -406,7 +450,8 @@ def validate_reservation_for_table(
             - status_code 400: If the table with the given ID does not exist.
             - status_code 409: If the reservation is not possible for the given table.
     """
-    qry = select(TableModel).where(TableModel.id == table_id)
+    qry = select(TableModel).where(TableModel.id == table_id)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     table: TableModel = session.scalars(qry).first()
 
     if not table:
