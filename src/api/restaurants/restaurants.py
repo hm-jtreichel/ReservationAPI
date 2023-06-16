@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Annotated
 
 from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
 from fastapi.encoders import jsonable_encoder
@@ -18,6 +18,8 @@ from ..reservations.reservationModels import Reservation as PydanticReservation,
     ReservationNew as PydanticReservationNew, \
     ReservationModel, \
     VALIDATION_ERRORS_RESTAURANT
+from ..owners.ownerModels import OwnerModel
+from ..authentication.authenticationUtils import get_current_owner
 from .addressModels import AddressModel
 
 router = APIRouter(
@@ -32,13 +34,15 @@ router = APIRouter(
 session = SessionFacade()
 
 
+# TODO: Doctrings!
 @router.get('/',
             summary="Get a list of restaurants (optionally matching provided query parameters)",
             response_description="The list of restaurants matching the provided query parameters",
             responses={
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
-def get_restaurants(restaurant_query: PydanticRestaurantQuery = Depends()) -> List[PydanticRestaurant]:
+def get_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                    restaurant_query: PydanticRestaurantQuery = Depends()) -> List[PydanticRestaurant]:
     """
     Get a list of restaurants matching the provided query parameters.
     \f
@@ -54,7 +58,8 @@ def get_restaurants(restaurant_query: PydanticRestaurantQuery = Depends()) -> Li
         HTTPException:
         If no restaurants match the provided query parameters, a HTTPException with a 404 status code is raised.
     """
-    qry = select(RestaurantModel).join(AddressModel, RestaurantModel.address)
+    qry = select(RestaurantModel).join(AddressModel, RestaurantModel.address)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     if restaurant_query.name:
         qry = qry.where(RestaurantModel.name == restaurant_query.name)
     if restaurant_query.owner_id:
@@ -84,7 +89,8 @@ def get_restaurants(restaurant_query: PydanticRestaurantQuery = Depends()) -> Li
             responses={
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
-def get_restaurant(restaurant_id: int = Path(description="The ID of the restaurant you are looking for.", gt=0)
+def get_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                   restaurant_id: int = Path(description="The ID of the restaurant you are looking for.", gt=0)
                    ) -> PydanticRestaurant:
     """
     Retrieve a single restaurant by its ID.
@@ -98,7 +104,9 @@ def get_restaurant(restaurant_id: int = Path(description="The ID of the restaura
     Raises:
         HTTPException: If no restaurant with the provided ID is found.
     """
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -108,13 +116,15 @@ def get_restaurant(restaurant_id: int = Path(description="The ID of the restaura
     return PydanticRestaurant.cast_from_model(restaurant)
 
 
+# TODO: PUT with authentication!!!
 @router.put('/',
             summary="Update one or multiple restaurants",
             response_description="The updated restaurants",
             responses={
                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"}
             })
-def update_restaurants(restaurants_to_update: List[PydanticRestaurantPut] = Body(description="The restaurant objects "
+def update_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                       restaurants_to_update: List[PydanticRestaurantPut] = Body(description="The restaurant objects "
                                                                                              "you want to update")
                        ) -> List[PydanticRestaurant]:
     """
@@ -146,6 +156,7 @@ def update_restaurants(restaurants_to_update: List[PydanticRestaurantPut] = Body
     return updated_restaurants
 
 
+# TODO: PUT with authentication!!!
 @router.put('/{restaurant_id}',
             summary="Update a single restaurant by ID",
             response_description="The updated restaurant",
@@ -199,14 +210,14 @@ def update_restaurant(restaurant_id: int = Path(description="The ID of the resta
 @router.delete('/',
                summary="Delete all restaurants in the database",
                response_description="The deleted restaurants")
-def delete_restaurants() -> List[PydanticRestaurant]:
+def delete_restaurants(current_owner: Annotated[OwnerModel, Depends(get_current_owner)]) -> List[PydanticRestaurant]:
     """
     Delete all restaurants.
     \f
     Returns:
         List[PydanticRestaurant]: The deleted restaurants.
     """
-    qry = select(RestaurantModel)
+    qry = select(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     restaurants = session.scalars(qry).all()
 
     session.delete_all(restaurants)
@@ -223,7 +234,8 @@ def delete_restaurants() -> List[PydanticRestaurant]:
                responses={
                    status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"}
                })
-def delete_restaurant(restaurant_id: int = Path(description="The ID of the restaurant to be deleted.", gt=0)
+def delete_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                      restaurant_id: int = Path(description="The ID of the restaurant to be deleted.", gt=0)
                       ) -> PydanticRestaurant:
     """
     Delete a single restaurant by ID.
@@ -237,7 +249,9 @@ def delete_restaurant(restaurant_id: int = Path(description="The ID of the resta
     Raises:
         HTTPException: If the restaurant with the given ID does not exist.
     """
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -259,7 +273,8 @@ def delete_restaurant(restaurant_id: int = Path(description="The ID of the resta
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"}
              },
              tags=['tables'])
-def create_tables_for_restaurant(restaurant_id: int = Path(description="The ID of the restaurant of the table", gt=0),
+def create_tables_for_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                                 restaurant_id: int = Path(description="The ID of the restaurant of the table", gt=0),
                                  tables_to_create: List[PydanticTableNew]
                                  = Body(description="The tables you want to create")) -> List[PydanticTable]:
     """
@@ -279,7 +294,9 @@ def create_tables_for_restaurant(restaurant_id: int = Path(description="The ID o
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (table-)objects present in the list request-body")
 
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -303,7 +320,8 @@ def create_tables_for_restaurant(restaurant_id: int = Path(description="The ID o
                  status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"}
              },
              tags=['tables'])
-def create_table_for_restaurant(restaurant_id: int = Path(description="The ID of the restaurant of the table", gt=0),
+def create_table_for_restaurant(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                                restaurant_id: int = Path(description="The ID of the restaurant of the table", gt=0),
                                 table_to_create: PydanticTableNew = Body(description="The table you want to create"),
                                 table_id: int = Path(description="The ID of the table you want to create", gt=0)
                                 ) -> PydanticTable:
@@ -321,7 +339,9 @@ def create_table_for_restaurant(restaurant_id: int = Path(description="The ID of
     Raises:
         HTTPException: If the restaurant with the given ID does not exist or if the table ID is not available.
     """
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -357,6 +377,7 @@ def create_table_for_restaurant(restaurant_id: int = Path(description="The ID of
              },
              tags=['reservations'])
 def create_reservations_for_restaurant(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         restaurant_id: int = Path(description="The ID of the restaurant of the reservation", gt=0),
         reservations_to_create: List[PydanticReservationNew] = Body(description="The reservations you want to create "
                                                                                 "(sorted by priority descending)")
@@ -380,7 +401,9 @@ def create_reservations_for_restaurant(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (reservation-)objects present in the list request-body")
 
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -427,6 +450,7 @@ def create_reservations_for_restaurant(
              },
              tags=['reservations'])
 def create_reservation_for_restaurant(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         restaurant_id: int = Path(description="The ID of the restaurant of the reservation", gt=0),
         reservation_to_create: PydanticReservationNew = Body(description="The reservation you want to "
                                                                          "create"),
@@ -447,7 +471,9 @@ def create_reservation_for_restaurant(
         HTTPException: If the request is invalid (e.g., ID not available), the restaurant with the given ID does not
                        exist, or an available table cannot be found for the provided reservation.
     """
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
@@ -488,6 +514,7 @@ def create_reservation_for_restaurant(
              },
              tags=['reservations'])
 def validate_reservation_for_restaurant(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         restaurant_id: int = Path(description="The ID of the restaurant of the reservation", gt=0),
         reservation_to_validate: PydanticReservationNew = Body(description="The reservation you want to validate"),
         ) -> PydanticTable:
@@ -506,7 +533,9 @@ def validate_reservation_for_restaurant(
             - status_code 400: If the restaurant with the given ID does not exist.
             - status_code 409: If the reservation is not possible for the given restaurant.
     """
-    qry = select(RestaurantModel).where(RestaurantModel.id == restaurant_id)
+    qry = select(RestaurantModel)\
+        .where(RestaurantModel.id == restaurant_id)\
+        .where(RestaurantModel.owner_id == current_owner.id)
     restaurant: RestaurantModel = session.scalars(qry).first()
 
     if not restaurant:
