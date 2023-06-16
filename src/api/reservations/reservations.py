@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Annotated
 
 from fastapi import APIRouter, status, Depends, Path, HTTPException, Body
 from fastapi.encoders import jsonable_encoder
@@ -12,6 +12,9 @@ from .reservationModels import Reservation as PydanticReservation, \
     ReservationPut as PydanticReservationPut, \
     ReservationModel
 from ..tables.tableModels import TableModel
+from ..owners.ownerModels import OwnerModel
+from ..restaurants.restaurantModels import RestaurantModel
+from ..authentication.authenticationUtils import get_current_owner
 
 router = APIRouter(
     prefix="/reservations",
@@ -29,13 +32,17 @@ session = SessionFacade()
             summary="Get a list of reservations (optionally matching provided query parameters)",
             response_description="The list of reservations matching the provided query parameters",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
-def get_reservations(reservation_query: PydanticReservationQuery = Depends()) -> List[PydanticReservation]:
+def get_reservations(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                     reservation_query: PydanticReservationQuery = Depends()) -> List[PydanticReservation]:
     """
     Gets a list of reservations matching the provided query parameters.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         reservation_query (PydanticReservationQuery): An object containing the query parameters.
 
     Returns:
@@ -44,7 +51,8 @@ def get_reservations(reservation_query: PydanticReservationQuery = Depends()) ->
     Raises:
         HTTPException: If no reservations match the provided query parameters.
     """
-    qry = select(ReservationModel).join(TableModel, ReservationModel.table)
+    qry = select(ReservationModel).join(TableModel, ReservationModel.table)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
 
     if reservation_query.restaurant_id:
         qry = qry.where(TableModel.restaurant_id == reservation_query.restaurant_id)
@@ -85,14 +93,18 @@ def get_reservations(reservation_query: PydanticReservationQuery = Depends()) ->
             summary="Get a single reservation with a specified ID",
             response_description="The reservation with the specified ID",
             responses={
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
             })
-def get_reservation(reservation_id: int = Path(description="The ID of the reservation you are looking for", gt=0)
+def get_reservation(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                    reservation_id: int = Path(description="The ID of the reservation you are looking for", gt=0)
                     ) -> PydanticReservation:
     """
     Gets a single reservation with the specified ID.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         reservation_id (int, Path): The ID of the reservation to retrieve.
 
     Returns:
@@ -101,7 +113,8 @@ def get_reservation(reservation_id: int = Path(description="The ID of the reserv
     Raises:
         HTTPException: If no reservation exists with the specified ID.
     """
-    qry = select(ReservationModel).where(ReservationModel.id == reservation_id)
+    qry = select(ReservationModel).where(ReservationModel.id == reservation_id).join(TableModel)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     reservation_model: ReservationModel = session.scalars(qry).first()
 
     if not reservation_model:
@@ -118,9 +131,11 @@ def get_reservation(reservation_id: int = Path(description="The ID of the reserv
             response_description="The updated reservations",
             responses={
                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request-body (e.g. empty list)"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_409_CONFLICT: {"description": "At least one update is not possible"}
             })
-def update_reservations(reservations_to_update: List[PydanticReservationPut] = Body(description="The reservation "
+def update_reservations(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                        reservations_to_update: List[PydanticReservationPut] = Body(description="The reservation "
                                                                                                 "objects you want to "
                                                                                                 "update")
                         ) -> List[PydanticReservation]:
@@ -128,6 +143,8 @@ def update_reservations(reservations_to_update: List[PydanticReservationPut] = B
     Updates one or multiple tables.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         reservations_to_update (List[PydanticReservationPut]): A list of reservation objects to be updated.
 
     Returns:
@@ -142,7 +159,7 @@ def update_reservations(reservations_to_update: List[PydanticReservationPut] = B
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No (reservation-)objects present in the list request-body")
 
-    validate_ids_in_put_request(reservations_to_update, ReservationModel)
+    validate_ids_in_put_request(reservations_to_update, ReservationModel, current_owner)
 
     updated_reservation_models = []
     invalid_reservations = []
@@ -180,9 +197,11 @@ def update_reservations(reservations_to_update: List[PydanticReservationPut] = B
             response_description="The updated reservation",
             responses={
                 status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not available)"},
+                status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_409_CONFLICT: {"description": "Update is not possible"}
             })
 def update_reservation(
+        current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
         reservation_id: int = Path(description="The ID of the reservation to update", gt=0),
         reservation_to_update: Union[PydanticReservationPut, PydanticReservationNew] = Body(
             description="The reservation object you want to update.")
@@ -191,14 +210,16 @@ def update_reservation(
     Updates a single reservation by ID.
     \f
     Args:
-    reservation (int): The ID of the reservation to update. Must be greater than 0.
-    reservation_to_update (Union[PydanticReservationPut, PydanticReservationNew]): The reservation object to update.
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
+        reservation (int): The ID of the reservation to update. Must be greater than 0.
+        reservation_to_update (Union[PydanticReservationPut, PydanticReservationNew]): The reservation object to update.
 
     Returns:
-    PydanticReservation: The updated reservation.
+        PydanticReservation: The updated reservation.
 
     Raises:
-    HTTPException: If there is no reservation for the given ID or if the request is invalid.
+        HTTPException: If there is no reservation for the given ID or if the request is invalid.
     """
     if type(reservation_to_update) == PydanticReservationPut:
         if reservation_id != reservation_to_update.id:
@@ -206,7 +227,8 @@ def update_reservation(
                                 detail=f"The path-parameter ID <{reservation_id}> doesn't match the "
                                        f"ID <{reservation_to_update.id}> of the table object in the request-body")
 
-    qry = select(ReservationModel).where(ReservationModel.id == reservation_id)
+    qry = select(ReservationModel).where(ReservationModel.id == reservation_id).join(TableModel)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     reservation_model: ReservationModel = session.scalars(qry).first()
 
     if not reservation_model:
@@ -236,15 +258,22 @@ def update_reservation(
 
 @router.delete('/',
                summary="Delete all reservations in the database",
-               response_description="The deleted tables")
-def delete_reservations() -> List[PydanticReservation]:
+               response_description="The deleted tables",
+               responses={
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
+               })
+def delete_reservations(current_owner: Annotated[OwnerModel, Depends(get_current_owner)]) -> List[PydanticReservation]:
     """
     Delete all reservations.
     \f
+    Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
     Returns:
         List[PydanticReservation]: The deleted reservations.
     """
-    qry = select(ReservationModel)
+    qry = select(ReservationModel).join(TableModel)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     reservations = session.scalars(qry).all()
 
     session.delete_all(reservations)
@@ -259,14 +288,18 @@ def delete_reservations() -> List[PydanticReservation]:
                summary="Delete a single reservation with a given ID in the database",
                response_description="The deleted reservation",
                responses={
-                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"}
+                   status.HTTP_400_BAD_REQUEST: {"description": "Invalid request (e.g. ID not found)"},
+                   status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"}
                })
-def delete_reservation(reservation_id: int = Path(description="The ID of the reservation to be deleted.", gt=0)
+def delete_reservation(current_owner: Annotated[OwnerModel, Depends(get_current_owner)],
+                       reservation_id: int = Path(description="The ID of the reservation to be deleted.", gt=0)
                        ) -> PydanticReservation:
     """
     Delete a single reservation by ID.
     \f
     Args:
+        current_owner (Annotated[OwnerModel, Depends(get_current_owner)]):
+            The Owner matching the given authentication token.
         reservation_id (int, Path): The ID of the reservation to be deleted.
 
     Returns:
@@ -275,7 +308,8 @@ def delete_reservation(reservation_id: int = Path(description="The ID of the res
     Raises:
         HTTPException: If the reservation with the given ID does not exist.
     """
-    qry = select(ReservationModel).where(ReservationModel.id == reservation_id)
+    qry = select(ReservationModel).where(ReservationModel.id == reservation_id).join(TableModel)\
+        .join(RestaurantModel).where(RestaurantModel.owner_id == current_owner.id)
     reservation: ReservationModel = session.scalars(qry).first()
 
     if not reservation:
