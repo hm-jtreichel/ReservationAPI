@@ -12,7 +12,15 @@ from pycountry import countries
 
 from src.db.manager import SessionFacade
 
+from src.db.models import Restaurant, Table, Reservation
+
 T = TypeVar('T')
+
+DATA_MODEL_ORDER = {
+    Reservation: 2,
+    Table: 1,
+    Restaurant: 0
+}
 
 session = SessionFacade()
 
@@ -44,13 +52,15 @@ def get_multiple_elements_in_list(elements: List[T]) -> List[T]:
 
 
 def validate_ids_in_put_request(elements_to_update: List[PydanticBase],
-                                data_model: Type[DeclarativeBase]) -> List[PydanticBase]:
+                                data_model: Type[DeclarativeBase],
+                                current_owner) -> List[PydanticBase]:
     """
     Validates the IDs of the elements to be updated in a PUT request.
 
     Args:
         elements_to_update (List[PydanticBase]): A list of PydanticBase objects to be updated.
         data_model (Type[DeclarativeBase]): The database model to use.
+        current_owner: The owner which is currently authenticated.
 
     Returns:
         List[PydanticBase]: The list of PydanticBase objects to be updated (if all are valid).
@@ -67,6 +77,17 @@ def validate_ids_in_put_request(elements_to_update: List[PydanticBase],
                                    f"[{', '.join(map(str, multiple_ids))}]")
 
     qry = select(data_model.id).where(data_model.id.in_(ids_to_update))
+
+    order = DATA_MODEL_ORDER[data_model]
+
+    if order > 1:
+        qry = qry.join(Table.reservations)
+
+    if order > 0:
+        qry = qry.join(Restaurant.tables)
+
+    qry = qry.where(Restaurant.owner_id == current_owner.id)
+
     updatable_ids = session.scalars(qry).all()
 
     not_existing_ids = set(ids_to_update) - set(updatable_ids)
