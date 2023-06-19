@@ -1,6 +1,8 @@
 """
 A module containing helper functions used for the authentication.
 """
+import os
+
 from passlib.context import CryptContext
 
 from typing import Annotated
@@ -16,10 +18,6 @@ from fastapi.security import OAuth2PasswordBearer
 
 from ..owners.ownerModels import OwnerModel
 from .authenticationModels import TokenData
-
-SECRET_KEY = "26f3bad8b23608b165b1f57694bd3a775bf41107d8d2f8be5637c6da3bc68dc1"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 10
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/token')
 
@@ -72,10 +70,11 @@ def create_access_token(data: dict) -> str:
         JWT (str): JWT for authentication.
     """
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + timedelta(minutes=int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES")))
 
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, os.environ.get("HASHING_SECRET_KEY"),
+                             algorithm=os.environ.get("HASHING_ALGORITHM"))
     return encoded_jwt
 
 
@@ -121,7 +120,8 @@ def get_current_owner(token: Annotated[str, Depends(oauth2_scheme)]):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, os.environ.get("HASHING_SECRET_KEY"),
+                             algorithms=[os.environ.get("HASHING_ALGORITHM")])
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
