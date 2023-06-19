@@ -30,8 +30,8 @@ session = SessionFacade()
 
 
 @router.get("/",
-            summary="Get a list of owners (optionally matching provided query parameters)",
-            response_description="The list of owners matching the provided query parameters",
+            summary="Get your own owner information",
+            response_description="Owner object of the logged in owner.",
             responses={
                 status.HTTP_401_UNAUTHORIZED: {"description": "User not authorized"},
                 status.HTTP_404_NOT_FOUND: {"description": "No results for request found"}
